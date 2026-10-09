@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag, for example v0.1.0. Empty uses package.json version."
+        required: false
+        type: string
+      delete_existing:
+        description: "Delete an existing release/tag with the same version before publishing. Use only before public release."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${{ inputs.version }}"
+
+          if [[ -z "$version" ]]; then
+            package_version="$(node -p "require('./package.json').version")"
+            version="v${package_version}"
+          fi
+
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "invalid version: $version" >&2
+            echo "production release versions must be vMAJOR.MINOR.PATCH, for example v0.1.0" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build release assets
+        run: scripts/build-release.sh "${{ steps.meta.outputs.version }}"
+
+      - name: Delete existing release
+        if: ${{ inputs.delete_existing }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: gh release delete "$VERSION" --cleanup-tag --yes || true
+
+      - name: Create release tag
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --force --prune --tags origin
+
+          if tag_sha="$(git rev-list -n 1 "$VERSION" 2>/dev/null)"; then
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "tag $VERSION points to $tag_sha, want $GITHUB_SHA" >&2
+              exit 1
+            fi
+
+            echo "tag $VERSION already points to $GITHUB_SHA"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" "$GITHUB_SHA" -m "moomoo $VERSION"
+          git push origin "refs/tags/$VERSION"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create \
+            "$VERSION" \
+            dist/* \
+            --verify-tag \
+            --title "moomoo $VERSION" \
+            --notes "Built from $GITHUB_SHA." \
+            --latest
