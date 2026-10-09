@@ -1,63 +1,63 @@
-# moomoo CLI 安装指南
+# moomoo CLI Installation Guide
 
-本文档只覆盖 `moomoo` CLI。拆分为独立仓库后，可直接作为项目安装说明使用。
+This document covers the standalone `moomoo` CLI installation, release, update, and uninstall flow.
 
-## GitHub Release 地址
+## GitHub Release Source
 
-默认 GitHub Release 地址已经内置：
+The default GitHub Release source is built in:
 
 ```text
 https://github.com/MoomooOpen/moomoo-cli
 ```
 
-CLI 会自动访问：
+The CLI resolves release metadata from:
 
 ```text
 {release_base}/releases/latest
 {release_base}/releases/download/{version}/{asset}
 ```
 
-如需验证 fork 或临时私有仓库，可以用 `MOOMOO_CLI_RELEASE_BASE` 覆盖默认地址。
+Set `MOOMOO_CLI_RELEASE_BASE` only when testing a fork or private release source.
 
 ## macOS / Linux
 
-推荐安装方式：
+Recommended installation:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MoomooOpen/moomoo-cli/main/scripts/install.sh | sh
 ```
 
-在仓库内验证安装脚本：
+To verify the installer from a local checkout:
 
 ```bash
 sh scripts/install.sh
 ```
 
-默认安装路径：
+Default install path:
 
 ```text
 ~/.moomoo/bin/moomoo
 ```
 
-安装脚本会自动把 `~/.moomoo/bin` 写入当前用户的 shell profile。首次安装后，重新打开终端，或按脚本提示执行 source 命令后即可直接运行：
+The installer adds `~/.moomoo/bin` to the current user's shell profile when needed. After the first installation, restart the terminal or run the `source` command printed by the installer, then verify:
 
 ```bash
 moomoo version
 ```
 
-指定安装目录：
+To install into a custom directory:
 
 ```bash
 INSTALL_DIR=/usr/local/bin sh scripts/install.sh
 ```
 
-Linux 默认下载 musl 包。如需 glibc 包：
+Linux downloads the musl build by default. To install the glibc build:
 
 ```bash
 MOOMOO_CLI_LIBC=glibc sh scripts/install.sh
 ```
 
-安装指定版本（用于测试 prerelease 或临时 tag）：
+To install a specific version, for example a prerelease or temporary test tag:
 
 ```bash
 MOOMOO_CLI_VERSION=v0.1.0-test.1 sh scripts/install.sh
@@ -65,21 +65,21 @@ MOOMOO_CLI_VERSION=v0.1.0-test.1 sh scripts/install.sh
 
 ## Windows
 
-推荐安装方式：
+Recommended installation:
 
 ```powershell
 iwr -UseBasicParsing https://raw.githubusercontent.com/MoomooOpen/moomoo-cli/main/scripts/install.ps1 -OutFile install.ps1
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-在仓库内验证指定版本：
+To verify a specific version from a local checkout:
 
 ```powershell
 $env:MOOMOO_CLI_VERSION="v0.1.0-test.1"
 powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 ```
 
-默认安装路径：
+Default install path:
 
 ```text
 %LOCALAPPDATA%\MoomooCLI\bin\moomoo.exe
@@ -87,39 +87,39 @@ powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 
 ## npm
 
-npm 包名：
+npm package name:
 
 ```text
 @futunn/moomoo-cli
 ```
 
-安装：
+Install from GitHub:
 
 ```bash
 npm install -g github:MoomooOpen/moomoo-cli
 ```
 
-发布到 npm registry 后，也可以使用：
+After the package is published to the npm registry:
 
 ```bash
 npm install -g @futunn/moomoo-cli
 ```
 
-npm wrapper 版本必须和 Git tag 对齐。例如 npm `0.1.0` 下载 GitHub Release `v0.1.0`。
+The npm wrapper version must match the Git tag. For example, npm version `0.1.0` downloads GitHub Release `v0.1.0`.
 
-测试本地 npm wrapper 时可指定临时 Release 版本：
+To test the local npm wrapper against a temporary release:
 
 ```bash
 MOOMOO_CLI_VERSION=v0.1.0-test.1 npm install -g .
 ```
 
-## 发布链路
+## Release Flow
 
-发布使用 GitHub Actions 的 `Release` 手动 workflow，只发布正式 release。
+Releases are published with the manual GitHub Actions `Release` workflow. The workflow is intended for stable releases.
 
-版本号可以手动填写，例如 `v0.1.0`。如果不填写，workflow 会读取根目录 `package.json` 的 `version`，自动生成对应 tag，例如 npm 版本 `0.1.0` 会发布 `v0.1.0`。
+The release version can be provided manually, for example `v0.1.0`. If omitted, the workflow reads the root `package.json` version and prefixes it with `v`, so npm version `0.1.0` publishes tag `v0.1.0`.
 
-workflow 会执行：
+The workflow runs:
 
 ```text
 go test ./...
@@ -129,15 +129,15 @@ git push origin <version>
 gh release create <version> dist/* --verify-tag
 ```
 
-如果 tag 已经存在，workflow 会校验它是否指向当前提交；如果不是当前提交，会停止发布，避免源码 tag 和二进制 assets 对不上。
+If the tag already exists, the workflow verifies that it points to the current commit. If it points elsewhere, publishing stops so source tags and binary assets cannot drift.
 
-验证正式版本下载：
+To verify release downloads:
 
 ```bash
 sh scripts/install.sh
 ```
 
-## 验证
+## Verification
 
 ```bash
 moomoo version
@@ -147,7 +147,7 @@ moomoo auth login
 moomoo auth status
 ```
 
-## 升级
+## Update
 
 ```bash
 moomoo update
@@ -156,39 +156,39 @@ moomoo update --force
 moomoo update --release-notes
 ```
 
-如果通过 GitHub npm 安装，重新安装：
+If installed from GitHub through npm, reinstall from GitHub:
 
 ```bash
 npm install -g github:MoomooOpen/moomoo-cli
 ```
 
-发布到 npm registry 后，使用：
+After npm registry publication:
 
 ```bash
 npm update -g @futunn/moomoo-cli
 ```
 
-## 卸载
+## Uninstall
 
-macOS / Linux：
+macOS / Linux:
 
 ```bash
 rm -f ~/.moomoo/bin/moomoo
 ```
 
-Windows：
+Windows:
 
 ```powershell
 Remove-Item "$env:LOCALAPPDATA\MoomooCLI\bin\moomoo.exe" -Force
 ```
 
-npm：
+npm:
 
 ```bash
 npm uninstall -g @futunn/moomoo-cli
 ```
 
-如需同时删除本地配置和 token：
+To remove local configuration and tokens as well:
 
 ```bash
 rm -rf ~/.moomoo
