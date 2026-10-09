@@ -62,7 +62,7 @@ type TokenResponse struct {
 	Scope               string      `json:"scope"`
 	Account             AccountInfo `json:"account"`
 	QuotePermissions    []string    `json:"quote_permissions"`
-	FutuID              string      `json:"futu_id"`
+	UserID              string      `json:"futu_id"`
 	MemberID            string      `json:"member_id"`
 	AccountNo           string      `json:"account_no"`
 	AccountType         string      `json:"account_type"`
@@ -79,7 +79,7 @@ type OAuthError struct {
 }
 
 func (e *OAuthError) Error() string {
-	return fmt.Sprintf("oauth error: %s — %s", e.Code, e.Description)
+	return fmt.Sprintf("oauth error: %s - %s", e.Code, e.Description)
 }
 
 // oauthErrorResponse represents an error returned by the OAuth token endpoint.

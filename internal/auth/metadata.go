@@ -97,7 +97,7 @@ func fillAccountFromClaims(account *AccountInfo, claims map[string]any) {
 }
 
 func fillAccountFields(account *AccountInfo, accountClaims map[string]any) {
-	fillString(&account.FutuID, accountClaims, "futu_id", "futuId", "user_id", "uid")
+	fillString(&account.UserID, accountClaims, "futu_id", "futuId", "user_id", "uid")
 	fillString(&account.MemberID, accountClaims, "member_id", "memberId")
 	fillString(&account.AccountID, accountClaims, "account_id", "accountId")
 	fillString(&account.AccountNo, accountClaims, "account_no", "accountNo")
@@ -127,8 +127,8 @@ func (t *TokenStore) updateScopePermissions() {
 }
 
 func mergeResponseAccount(account *AccountInfo, response *TokenResponse) {
-	if len(account.FutuID) == 0 {
-		account.FutuID = response.FutuID
+	if len(account.UserID) == 0 {
+		account.UserID = response.UserID
 	}
 	if len(account.MemberID) == 0 {
 		account.MemberID = response.MemberID
@@ -220,7 +220,7 @@ func claimTime(claims map[string]any, key string) time.Time {
 }
 
 func accountInfoEmpty(account AccountInfo) bool {
-	return len(account.FutuID) == 0 && len(account.MemberID) == 0 && len(account.AccountID) == 0 &&
+	return len(account.UserID) == 0 && len(account.MemberID) == 0 && len(account.AccountID) == 0 &&
 		len(account.AccountNo) == 0 &&
 		len(account.AccountType) == 0 && len(account.AccountChannel) == 0 &&
 		len(account.Name) == 0 && len(account.ActivatedPackages) == 0 &&

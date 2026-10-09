@@ -15,7 +15,7 @@ func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
 }
 
-// ── TokenResponse parsing ───────────────────────────────────────────────────
+// TokenResponse parsing.
 
 func TestParseTokenResponse_Valid(t *testing.T) {
 	body := `{
@@ -50,7 +50,7 @@ func TestParseTokenResponse_InvalidJSON(t *testing.T) {
 	}
 }
 
-// ── parseTokenResponseOrError ───────────────────────────────────────────────
+// parseTokenResponseOrError.
 
 func TestParseTokenResponseOrError_Success(t *testing.T) {
 	body := `{"access_token":"tok","refresh_token":"ref","expires_in":100,"token_type":"bearer"}`
@@ -81,18 +81,18 @@ func TestParseTokenResponseOrError_OAuthError(t *testing.T) {
 	}
 }
 
-// ── OAuthError.Error() ─────────────────────────────────────────────────────
+// OAuthError.Error().
 
 func TestOAuthError_Error(t *testing.T) {
 	e := &OAuthError{Code: "test_code", Description: "test desc"}
 	got := e.Error()
-	want := "oauth error: test_code — test desc"
+	want := "oauth error: test_code - test desc"
 	if got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
 }
 
-// ── BuildAuthorizationURL ───────────────────────────────────────────────────
+// BuildAuthorizationURL.
 
 func TestBuildAuthorizationURL(t *testing.T) {
 	pkce := &PKCEParams{
@@ -139,7 +139,7 @@ func TestOAuthHTTPClientHasTimeout(t *testing.T) {
 	}
 }
 
-// ── GenerateState ───────────────────────────────────────────────────────────
+// GenerateState.
 
 func TestGenerateState_Length(t *testing.T) {
 	state, err := GenerateState()
@@ -160,7 +160,7 @@ func TestGenerateState_Unique(t *testing.T) {
 	}
 }
 
-// ── BuildClientName ─────────────────────────────────────────────────────────
+// BuildClientName.
 
 func TestBuildClientName_WithOverride(t *testing.T) {
 	name := BuildClientName("MyApp")
@@ -180,7 +180,7 @@ func TestBuildClientName_Default(t *testing.T) {
 	}
 }
 
-// ── HTTP-level integration tests with httptest ──────────────────────────────
+// HTTP-level integration tests with httptest.
 
 func TestPostJSON_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +229,7 @@ func TestPostJSON_ServerDown(t *testing.T) {
 	}
 }
 
-// ── postForm ────────────────────────────────────────────────────────────────
+// postForm.
 
 func TestPostForm_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +278,7 @@ func TestPostForm_HTTPError(t *testing.T) {
 	}
 }
 
-// ── readResponseBody ────────────────────────────────────────────────────────
+// readResponseBody.
 
 func TestReadResponseBody_OK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -321,7 +321,7 @@ func TestReadResponseBody_HTTPError(t *testing.T) {
 	}
 }
 
-// ── parseRegistrationResponse ───────────────────────────────────────────────
+// parseRegistrationResponse.
 
 func TestParseRegistrationResponse_Valid(t *testing.T) {
 	body := `{

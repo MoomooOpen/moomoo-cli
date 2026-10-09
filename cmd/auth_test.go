@@ -33,7 +33,7 @@ func TestNewAuthStatusValidToken(t *testing.T) {
 		LoggedInAt: now.Add(-time.Hour), ExpiresAt: now.Add(time.Hour),
 		ClientName: "test-client",
 		Account: auth.AccountInfo{
-			FutuID:      "moomoo-1",
+			UserID:      "moomoo-1",
 			MemberID:    "member-1",
 			AccountNo:   "account-1",
 			AccountID:   "account-id-1",
@@ -54,7 +54,7 @@ func TestNewAuthStatusValidToken(t *testing.T) {
 	if status.Account.AccountID != "account-id-1" || status.Account.AccountType != "margin" {
 		t.Fatalf("non-sensitive account fields were not preserved: %#v", status.Account)
 	}
-	if status.Account.FutuID != "" || status.Account.MemberID != "" || status.Account.AccountNo != "" {
+	if status.Account.UserID != "" || status.Account.MemberID != "" || status.Account.AccountNo != "" {
 		t.Fatalf("sensitive user IDs must not be exposed: %#v", status.Account)
 	}
 	if len(status.QuotePermissions) != 2 {
@@ -66,7 +66,7 @@ func TestNewAuthStatusOmitsAccountWithOnlyUserIdentifiers(t *testing.T) {
 	store := &auth.TokenStore{
 		ExpiresAt: time.Now().Add(time.Hour),
 		Account: auth.AccountInfo{
-			FutuID:    "moomoo-1",
+			UserID:    "moomoo-1",
 			MemberID:  "member-1",
 			AccountNo: "account-1",
 		},

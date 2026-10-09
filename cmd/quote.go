@@ -44,7 +44,7 @@ func init() {
 }
 
 func runQuote(cmd *cobra.Command, args []string) error {
-	codes, err := parseFutuCodes(args)
+	codes, err := parseAPICodes(args)
 	if err != nil {
 		return err
 	}
@@ -61,8 +61,8 @@ func runQuote(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// parseFutuCodes parses args into moomoo API format codes (e.g. "HK.09988").
-func parseFutuCodes(args []string) ([]string, error) {
+// parseAPICodes parses args into moomoo API format codes (e.g. "HK.09988").
+func parseAPICodes(args []string) ([]string, error) {
 	parsed, err := symbol.ParseMulti(args)
 	if err != nil {
 		return nil, fmt.Errorf("parsing symbols: %w", err)
@@ -70,7 +70,7 @@ func parseFutuCodes(args []string) ([]string, error) {
 
 	codes := make([]string, 0, len(parsed))
 	for _, s := range parsed {
-		codes = append(codes, s.FutuCode())
+		codes = append(codes, s.APICode())
 	}
 	return codes, nil
 }

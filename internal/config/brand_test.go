@@ -21,4 +21,7 @@ func TestDefaultConfigUsesMoomooDefaults(t *testing.T) {
 	if filepath.Base(ConfigDir()) != configDirName {
 		t.Fatalf("config directory = %q, want base name %q", ConfigDir(), configDirName)
 	}
+	if cfg.ReportHost != DefaultReportHost {
+		t.Fatalf("ReportHost = %q, want %q", cfg.ReportHost, DefaultReportHost)
+	}
 }

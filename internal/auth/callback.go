@@ -92,7 +92,7 @@ type CallbackServer struct {
 }
 
 // NewCallbackServer creates and starts a callback server listening on a local port.
-// It tries ports 18888–18890 until one is available.
+// It tries ports 18888-18890 until one is available.
 func NewCallbackServer() (*CallbackServer, error) {
 	listener, err := listenOnAvailablePort()
 	if err != nil {
@@ -197,6 +197,6 @@ func listenOnAvailablePort() (net.Listener, error) {
 			return ln, nil
 		}
 	}
-	return nil, fmt.Errorf("unable to listen on ports %d–%d; please free one of these ports",
+	return nil, fmt.Errorf("unable to listen on ports %d-%d; please free one of these ports",
 		callbackPortStart, callbackPortStart+callbackPortRetries-1)
 }

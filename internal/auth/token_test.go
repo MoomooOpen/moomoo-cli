@@ -36,7 +36,7 @@ func TestDeleteTokenRemovesFileAndIsIdempotent(t *testing.T) {
 	}
 }
 
-// ── TokenStore.IsExpired ────────────────────────────────────────────────────
+// TokenStore.IsExpired.
 
 func TestTokenStore_IsExpired_FreshToken(t *testing.T) {
 	store := &TokenStore{
@@ -76,7 +76,7 @@ func TestTokenStore_IsExpired_ExactlyAtBuffer(t *testing.T) {
 	}
 }
 
-// ── unmarshalToken ──────────────────────────────────────────────────────────
+// unmarshalToken.
 
 func TestUnmarshalToken_Valid(t *testing.T) {
 	data := []byte(`{
@@ -107,7 +107,7 @@ func TestUnmarshalToken_InvalidJSON(t *testing.T) {
 	}
 }
 
-// ── buildUpdatedStore ───────────────────────────────────────────────────────
+// buildUpdatedStore.
 
 func TestBuildUpdatedStore(t *testing.T) {
 	resp := &TokenResponse{
@@ -198,7 +198,7 @@ func TestEnsureValidStoreRefreshesExpiredToken(t *testing.T) {
 	}
 }
 
-// ── removeFileIfExists ──────────────────────────────────────────────────────
+// removeFileIfExists.
 
 func TestRemoveFileIfExists_NonExistentFile(t *testing.T) {
 	err := removeFileIfExists("/tmp/moomoo-test-nonexistent-file-12345")

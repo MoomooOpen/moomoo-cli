@@ -32,7 +32,7 @@ type TokenStore struct {
 
 // AccountInfo contains account metadata available locally from OAuth2.
 type AccountInfo struct {
-	FutuID              string   `json:"futu_id,omitempty"`
+	UserID              string   `json:"futu_id,omitempty"`
 	MemberID            string   `json:"member_id,omitempty"`
 	AccountID           string   `json:"account_id,omitempty"`
 	AccountNo           string   `json:"account_no,omitempty"`

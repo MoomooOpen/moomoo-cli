@@ -343,8 +343,8 @@ func selectStatusAccount(accounts []service.Account) *service.Account {
 }
 
 func mergeStatusAccount(target *auth.AccountInfo, source *service.Account) {
-	if len(target.FutuID) == 0 {
-		target.FutuID = source.FutuID
+	if len(target.UserID) == 0 {
+		target.UserID = source.UserID
 	}
 	if len(target.AccountNo) == 0 {
 		target.AccountNo = source.AccountNo
@@ -478,7 +478,7 @@ func newAuthStatus(store *auth.TokenStore, _ string) authStatusData {
 }
 
 func sanitizeStatusAccount(account auth.AccountInfo) auth.AccountInfo {
-	account.FutuID = ""
+	account.UserID = ""
 	account.MemberID = ""
 	account.AccountNo = ""
 	return account

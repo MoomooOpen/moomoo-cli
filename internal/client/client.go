@@ -18,7 +18,7 @@ import (
 	"github.com/MoomooOpen/moomoo-cli/internal/reporting"
 )
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// Constants.
 
 const (
 	defaultRequestTimeout = 30 * time.Second
@@ -49,7 +49,7 @@ const (
 	ctxKeyPathTemplate
 )
 
-// ── Client ───────────────────────────────────────────────────────────────────
+// Client.
 
 // Client is the single HTTP client for all moomoo API calls.
 type Client struct {
@@ -77,7 +77,7 @@ type CallOpts struct {
 	PathParams map[string]string // e.g. {id} substitution
 }
 
-// ── Options ──────────────────────────────────────────────────────────────────
+// Options.
 
 // ClientOption is a functional option for constructing a Client.
 type ClientOption func(*Client)
@@ -113,7 +113,7 @@ func WithRequestReporter(reporter requestReporter) ClientOption {
 	return func(c *Client) { c.reporter = reporter }
 }
 
-// ── Constructor ──────────────────────────────────────────────────────────────
+// Constructor.
 
 // New creates a Client pointed at the given base URL.
 func New(base string, opts ...ClientOption) *Client {
@@ -129,7 +129,7 @@ func New(base string, opts ...ClientOption) *Client {
 	return c
 }
 
-// ── Token management ─────────────────────────────────────────────────────────
+// Token management.
 
 // SetToken allows callers (e.g. the auth module) to inject or update the
 // bearer token after the client has been created.
@@ -146,7 +146,7 @@ func (c *Client) readToken() string {
 	return c.token
 }
 
-// ── Convenience verbs ────────────────────────────────────────────────────────
+// Convenience verbs.
 
 // Get performs an HTTP GET request.
 func (c *Client) Get(ctx context.Context, path string, params url.Values, result any) error {
@@ -158,7 +158,7 @@ func (c *Client) Post(ctx context.Context, path string, body any, result any) er
 	return c.Do(ctx, http.MethodPost, path, nil, body, result)
 }
 
-// ── Endpoint-based call ──────────────────────────────────────────────────────
+// Endpoint-based call.
 
 // Call looks up an endpoint by name in the registry, resolves path parameters,
 // and dispatches the request through Do.
@@ -184,7 +184,7 @@ func resolvePathParams(path string, params map[string]string) string {
 	return path
 }
 
-// ── Core request pipeline ────────────────────────────────────────────────────
+// Core request pipeline.
 
 // Do is the single exit point for ALL requests. It constructs the request,
 // signs it, injects headers, applies rate limiting, sends with retries on
@@ -227,7 +227,7 @@ func marshalBody(body any) ([]byte, error) {
 	return json.Marshal(body)
 }
 
-// ── Retry loop ───────────────────────────────────────────────────────────────
+// Retry loop.
 
 // doWithRetry executes the request up to maxRetries times for retryable errors.
 func (c *Client) doWithRetry(ctx context.Context, method, fullURL, path, pathTemplate, query string, bodyBytes []byte, result any) error {
@@ -279,7 +279,7 @@ func isRetryable(err error) bool {
 	}
 }
 
-// ── Single-attempt send & parse ──────────────────────────────────────────────
+// Single-attempt send and parse.
 
 // sendAndParse builds, sends, and parses one request attempt.
 func (c *Client) sendAndParse(ctx context.Context, method, fullURL, path, pathTemplate, query string, bodyBytes []byte, result any) error {
@@ -330,7 +330,7 @@ func isTimeoutErr(err error) bool {
 	return false
 }
 
-// ── Request construction ─────────────────────────────────────────────────────
+// Request construction.
 
 // newRequest constructs an *http.Request with all required headers and signing.
 func (c *Client) newRequest(ctx context.Context, method, fullURL, path, query string, bodyBytes []byte) (*http.Request, error) {
@@ -413,7 +413,7 @@ func (c *Client) reportRequest(ctx context.Context, method, path, pathTemplate, 
 	}))
 }
 
-// ── Response parsing ─────────────────────────────────────────────────────────
+// Response parsing.
 
 // parseResponseBody decodes the response body or converts it to a CLIError.
 func parseResponseBody(statusCode int, respBody []byte, result any) error {

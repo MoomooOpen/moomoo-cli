@@ -116,3 +116,21 @@ func TestReporterPostsEventWithBearerToken(t *testing.T) {
 		t.Fatal("expected report request")
 	}
 }
+
+func TestReportURLUsesDefaultHost(t *testing.T) {
+	want := "https://report.moomoo.com/agent_report/call"
+	if got := ReportURL(""); got != want {
+		t.Fatalf("ReportURL() = %q, want %q", got, want)
+	}
+}
+
+func TestReporterEnabledWithDefaultEndpoint(t *testing.T) {
+	reporter := NewReporter(Options{Enabled: true})
+	if !reporter.enabled {
+		t.Fatal("reporter should be enabled when using the default endpoint")
+	}
+	if reporter.endpoint != "https://report.moomoo.com/agent_report/call" {
+		t.Fatalf("endpoint = %q", reporter.endpoint)
+	}
+	_ = reporter.Close(context.Background())
+}

@@ -417,7 +417,7 @@ func parsePlaceOrderSymbol(rawSymbol, orderClass string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parsing symbol: %w", err)
 	}
-	return sym.FutuCode(), nil
+	return sym.APICode(), nil
 }
 
 func parseMultiLegInfo(value string) (json.RawMessage, error) {
@@ -779,7 +779,7 @@ func buildTradingInfoRequest(rawSymbol string) (service.TradingInfoRequest, erro
 	}
 	return service.TradingInfoRequest{
 		Account:   account,
-		Code:      sym.FutuCode(),
+		Code:      sym.APICode(),
 		OrderType: orderType,
 		Price:     price,
 		OrderID:   strings.TrimSpace(orderFlags.orderID),

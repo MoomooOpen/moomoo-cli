@@ -157,8 +157,8 @@ func buildSymbol(code, market string) *Symbol {
 	}
 }
 
-// FutuCode returns the symbol in moomoo API format: "MARKET.CODE"
+// APICode returns the symbol in moomoo API format: "MARKET.CODE"
 // (e.g. "HK.09988", "US.AAPL").
-func (s *Symbol) FutuCode() string {
+func (s *Symbol) APICode() string {
 	return s.Market + "." + s.Code
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/MoomooOpen/moomoo-cli/internal/reporting"
 )
 
-// ── OAuth mode headers ──────────────────────────────────────────────────────
+// OAuth mode headers.
 
 func TestSetHeaders_OAuthMode(t *testing.T) {
 	c := New("https://api.example.com",
@@ -153,7 +153,7 @@ func TestCallOmitsReportSourceForReadOnlyEndpoints(t *testing.T) {
 	}
 }
 
-// ── Token management ────────────────────────────────────────────────────────
+// Token management.
 
 func TestSetToken_ReadToken(t *testing.T) {
 	c := New("https://api.example.com", WithToken("initial"))
@@ -167,7 +167,7 @@ func TestSetToken_ReadToken(t *testing.T) {
 	}
 }
 
-// ── Constructor ─────────────────────────────────────────────────────────────
+// Constructor.
 
 func TestNew_Defaults(t *testing.T) {
 	c := New("https://api.example.com/")
@@ -179,7 +179,7 @@ func TestNew_Defaults(t *testing.T) {
 	}
 }
 
-// ── buildURL ────────────────────────────────────────────────────────────────
+// buildURL.
 
 func TestBuildURL_NoQuery(t *testing.T) {
 	c := New("https://api.example.com")
@@ -197,7 +197,7 @@ func TestBuildURL_WithQuery(t *testing.T) {
 	}
 }
 
-// ── resolvePathParams ───────────────────────────────────────────────────────
+// resolvePathParams.
 
 func TestResolvePathParams(t *testing.T) {
 	got := resolvePathParams("/v1/orders/{id}/cancel", map[string]string{"id": "12345"})
@@ -213,7 +213,7 @@ func TestResolvePathParams_SpecialChars(t *testing.T) {
 	}
 }
 
-// ── End-to-end with httptest ────────────────────────────────────────────────
+// End-to-end with httptest.
 
 func TestDo_OAuthMode(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -401,7 +401,7 @@ func TestCallReportsThroughAsyncReporter(t *testing.T) {
 	}
 }
 
-// ── marshalBody ─────────────────────────────────────────────────────────────
+// marshalBody.
 
 func TestMarshalBody_Nil(t *testing.T) {
 	b, err := marshalBody(nil)
@@ -426,7 +426,7 @@ func TestMarshalBody_Struct(t *testing.T) {
 	}
 }
 
-// ── commandFromCtx ──────────────────────────────────────────────────────────
+// commandFromCtx.
 
 func TestCommandFromCtx_Set(t *testing.T) {
 	ctx := context.WithValue(context.Background(), CtxKeyCommand, "moomoo quote")

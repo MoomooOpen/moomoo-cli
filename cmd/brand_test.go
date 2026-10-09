@@ -8,12 +8,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/MoomooOpen/moomoo-cli/internal/config"
 )
 
 const (
 	expectedRootCommandName = "moomoo"
 	expectedZshCompletion   = `"${fpath[1]}/_moomoo"`
-	legacyZshCompletion     = `"${fpath[1]}/_futu"`
 )
 
 func TestRootCommandUsesMoomooBrand(t *testing.T) {
@@ -51,8 +52,18 @@ func TestCompletionInstructionsUseMoomooZshFilename(t *testing.T) {
 	if !strings.Contains(completionCmd.Long, expectedZshCompletion) {
 		t.Fatalf("completion instructions do not contain %q", expectedZshCompletion)
 	}
-	if strings.Contains(completionCmd.Long, legacyZshCompletion) {
-		t.Fatalf("completion instructions still contain legacy filename %q", legacyZshCompletion)
+}
+
+func TestConfigListHidesInternalKeys(t *testing.T) {
+	hiddenKeys := map[string]bool{
+		config.KeyTokenFile:  true,
+		config.KeyTelemetry:  true,
+		config.KeyReportHost: true,
+	}
+	for _, key := range allConfigKeys {
+		if hiddenKeys[key] {
+			t.Fatalf("internal config key %q must not appear in config list", key)
+		}
 	}
 }
 

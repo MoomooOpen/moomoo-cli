@@ -145,7 +145,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", formatTable,
 		"Output format: table or json (default: table)")
 	rootCmd.PersistentFlags().StringVar(&tokenFile, "token-file", "",
-		"Path to the encrypted OAuth token file (default: token_file from config)")
+		"Path to an alternate encrypted OAuth token file")
 }
 
 // initSharedState loads config, ensures auth (when needed), and initializes
@@ -226,7 +226,7 @@ func initOAuthClient() error {
 func newRequestReporter(token string) *reporting.Reporter {
 	requestReporter = reporting.NewReporter(reporting.Options{
 		Enabled: cfg.Telemetry,
-		Host:    reporting.DefaultHost,
+		Host:    cfg.ReportHost,
 		Token:   token,
 	})
 	return requestReporter

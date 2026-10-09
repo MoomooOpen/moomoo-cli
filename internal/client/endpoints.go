@@ -12,7 +12,7 @@ type Endpoint struct {
 // Endpoints is the single source of truth for all moomoo API routes.
 // Keys follow the convention "domain.resource" or "domain.resource.action".
 var Endpoints = map[string]Endpoint{
-	// ── Quote ────────────────────────────────────────────────────────────
+	// Quote.
 	"quote.stock_quote":  {Method: http.MethodPost, Path: "/api/v1.0/quote/stock-quote"},
 	"quote.snapshot":     {Method: http.MethodGet, Path: "/v1/quote/snapshot"},
 	"quote.kline":        {Method: http.MethodGet, Path: "/v1/quote/kline"},
@@ -22,7 +22,7 @@ var Endpoints = map[string]Endpoint{
 	"quote.option.chain": {Method: http.MethodGet, Path: "/v1/quote/option/chain"},
 	"quote.static":       {Method: http.MethodGet, Path: "/v1/quote/static"},
 
-	// ── Trade ────────────────────────────────────────────────────────────
+	// Trade.
 	"trade.order.place":   {Method: http.MethodPost, Path: "/api/v1.0/accounts/{acc_id}/orders", ReportSource: true},
 	"trade.order.modify":  {Method: http.MethodPut, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}", ReportSource: true},
 	"trade.order.cancel":  {Method: http.MethodDelete, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}", ReportSource: true},
@@ -37,7 +37,7 @@ var Endpoints = map[string]Endpoint{
 	"trade.account.funds": {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/funds"},
 	"trade.account.info":  {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/acctradinginfo"},
 
-	// ── Crypto Trading ───────────────────────────────────────────────────
+	// Crypto trading.
 	"crypto.account.total_balance": {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/total-balance"},
 	"crypto.account.max_qty":       {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/purchasing-power"},
 	"crypto.order.place":           {Method: http.MethodPost, Path: "/api/v1/crypto/accounts/{acc_id}/orders", ReportSource: true},
@@ -49,7 +49,7 @@ var Endpoints = map[string]Endpoint{
 	"crypto.deal.fills":            {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/fills"},
 	"crypto.deal.history":          {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/fills/history"},
 
-	// ── Web3 ─────────────────────────────────────────────────────────────
+	// Web3.
 	"web3.wallet.balance": {Method: http.MethodGet, Path: "/v1/web3/wallet/balance"},
 	"web3.swap.quote":     {Method: http.MethodPost, Path: "/v1/web3/swap/quote"},
 	"web3.swap.execute":   {Method: http.MethodPost, Path: "/v1/web3/swap/execute", ReportSource: true},
