@@ -1,4 +1,4 @@
-# @futunn/moomoo-cli
+# @moomoo/moomoo-cli
 
 npm wrapper for the `moomoo` CLI.
 
@@ -10,7 +10,7 @@ moomoo version
 After the package is published to the npm registry:
 
 ```bash
-npm install -g @futunn/moomoo-cli
+npm install -g @moomoo/moomoo-cli
 ```
 
 Update a GitHub npm installation by reinstalling from GitHub:
@@ -22,7 +22,7 @@ npm install -g github:MoomooOpen/moomoo-cli
 After npm registry publication:
 
 ```bash
-npm update -g @futunn/moomoo-cli
+npm update -g @moomoo/moomoo-cli
 ```
 
 The default GitHub Release source is `https://github.com/MoomooOpen/moomoo-cli`.

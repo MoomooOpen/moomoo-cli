@@ -32,7 +32,7 @@ npm install -g github:MoomooOpen/moomoo-cli
 After the package is published to the npm registry, this will also be available:
 
 ```bash
-npm install -g @futunn/moomoo-cli
+npm install -g @moomoo/moomoo-cli
 ```
 
 ## Quick Start
@@ -95,7 +95,7 @@ npm install -g github:MoomooOpen/moomoo-cli
 After the package is published to the npm registry, use:
 
 ```bash
-npm update -g @futunn/moomoo-cli
+npm update -g @moomoo/moomoo-cli
 ```
 
 ## Configuration

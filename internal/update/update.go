@@ -25,7 +25,7 @@ import (
 const (
 	productName = "moomoo"
 	binaryName  = "moomoo"
-	npmPackage  = "@futunn/moomoo-cli"
+	npmPackage  = "@moomoo/moomoo-cli"
 
 	envReleaseBase = "MOOMOO_CLI_RELEASE_BASE"
 	envLibc        = "MOOMOO_CLI_LIBC"
@@ -48,7 +48,7 @@ const (
 	archiveExtTarGzip   = "tar.gz"
 	archiveExtZip       = "zip"
 	windowsExecutable   = ".exe"
-	npmInstallHint      = "This CLI was installed by npm. Run `npm update -g @futunn/moomoo-cli` to upgrade."
+	npmInstallHint      = "This CLI was installed by npm. Run `npm update -g @moomoo/moomoo-cli` to upgrade."
 	homebrewInstallHint = "This CLI appears to be managed by Homebrew. Run `brew upgrade moomoo` to upgrade."
 )
 

@@ -90,7 +90,7 @@ Default install path:
 npm package name:
 
 ```text
-@futunn/moomoo-cli
+@moomoo/moomoo-cli
 ```
 
 Install from GitHub:
@@ -102,7 +102,7 @@ npm install -g github:MoomooOpen/moomoo-cli
 After the package is published to the npm registry:
 
 ```bash
-npm install -g @futunn/moomoo-cli
+npm install -g @moomoo/moomoo-cli
 ```
 
 The npm wrapper version must match the Git tag. For example, npm version `0.1.0` downloads GitHub Release `v0.1.0`.
@@ -165,7 +165,7 @@ npm install -g github:MoomooOpen/moomoo-cli
 After npm registry publication:
 
 ```bash
-npm update -g @futunn/moomoo-cli
+npm update -g @moomoo/moomoo-cli
 ```
 
 ## Uninstall
@@ -185,7 +185,7 @@ Remove-Item "$env:LOCALAPPDATA\MoomooCLI\bin\moomoo.exe" -Force
 npm:
 
 ```bash
-npm uninstall -g @futunn/moomoo-cli
+npm uninstall -g @moomoo/moomoo-cli
 ```
 
 To remove local configuration and tokens as well:
