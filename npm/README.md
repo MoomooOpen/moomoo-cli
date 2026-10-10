@@ -7,7 +7,7 @@ npm install -g github:MoomooOpen/moomoo-cli
 moomoo version
 ```
 
-After the package is published to the npm registry:
+Direct npm registry installation is not available yet and is still in progress:
 
 ```bash
 npm install -g @moomoo/moomoo-cli
@@ -19,7 +19,7 @@ Update a GitHub npm installation by reinstalling from GitHub:
 npm install -g github:MoomooOpen/moomoo-cli
 ```
 
-After npm registry publication:
+Direct npm registry updates are not available yet and are still in progress:
 
 ```bash
 npm update -g @moomoo/moomoo-cli
