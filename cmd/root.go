@@ -67,7 +67,10 @@ const (
 	nanosecondTimestampMin    = int64(1_000_000_000_000_000_000)
 	nanosecondsPerMillisecond = int64(time.Millisecond)
 	nanosecondsPerMicrosecond = int64(time.Microsecond)
+	displayTimezoneOffset     = int(8 * time.Hour / time.Second)
 )
+
+var displayTimeLocation = time.FixedZone("UTC+8", displayTimezoneOffset)
 
 // Package-level shared state populated by PersistentPreRunE.
 var (
@@ -516,14 +519,18 @@ func formatTimestamp(ts int64) string {
 	}
 	switch {
 	case ts >= nanosecondTimestampMin:
-		return time.Unix(0, ts).Format("2006-01-02 15:04:05")
+		return formatDisplayTime(time.Unix(0, ts))
 	case ts >= microsecondTimestampMin:
-		return time.Unix(0, ts*nanosecondsPerMicrosecond).Format("2006-01-02 15:04:05")
+		return formatDisplayTime(time.Unix(0, ts*nanosecondsPerMicrosecond))
 	case ts >= millisecondTimestampMin:
-		return time.Unix(0, ts*nanosecondsPerMillisecond).Format("2006-01-02 15:04:05")
+		return formatDisplayTime(time.Unix(0, ts*nanosecondsPerMillisecond))
 	default:
-		return time.Unix(ts, 0).Format("2006-01-02 15:04:05")
+		return formatDisplayTime(time.Unix(ts, 0))
 	}
+}
+
+func formatDisplayTime(value time.Time) string {
+	return value.In(displayTimeLocation).Format("2006-01-02 15:04:05")
 }
 
 // cmdContext returns a context annotated with the command name.
