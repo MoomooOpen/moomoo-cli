@@ -8,13 +8,12 @@ import (
 
 // Market identifier constants.
 const (
-	MarketHK     = "HK"
-	MarketUS     = "US"
-	MarketSH     = "SH"
-	MarketSZ     = "SZ"
-	MarketBJ     = "BJ"
-	MarketBMD    = "BMD"
-	MarketCrypto = "CRYPTO"
+	MarketHK  = "HK"
+	MarketUS  = "US"
+	MarketSH  = "SH"
+	MarketSZ  = "SZ"
+	MarketBJ  = "BJ"
+	MarketBMD = "BMD"
 )
 
 // knownMarkets contains market prefixes recognised by the moomoo API.
@@ -34,29 +33,23 @@ const hkCodeWidth = 5
 type Symbol struct {
 	Code   string // e.g. "00700"
 	Market string // e.g. "HK"
-	Full   string // e.g. "00700.HK"
+	Full   string // e.g. "HK.00700"
 }
 
 // Parse parses a symbol input string into a Symbol struct.
 //
 // Supported formats:
-//   - "700.HK" -> pads to "00700.HK"
-//   - "AAPL" -> defaults to "AAPL.US"
-//   - "AAPL.US" -> as-is
-//   - "BTC-USD" -> "BTC-USD.CRYPTO"
+//   - "HK.700" -> pads to "HK.00700"
+//   - "US.AAPL" -> as-is
 func Parse(input string) (*Symbol, error) {
 	input = strings.TrimSpace(input)
 	if len(input) == 0 {
 		return nil, fmt.Errorf("empty symbol input")
 	}
 
-	if isCryptoSymbol(input) {
-		return buildCrypto(input), nil
-	}
-
-	code, market := splitSymbol(input)
-	if len(market) == 0 {
-		market = inferMarket(code)
+	code, market, err := splitSymbol(input)
+	if err != nil {
+		return nil, err
 	}
 	market = strings.ToUpper(market)
 	code = normalizeCode(code, market)
@@ -81,41 +74,18 @@ func ParseMulti(inputs []string) ([]*Symbol, error) {
 	return symbols, nil
 }
 
-// isCryptoSymbol checks if the input looks like a crypto pair (contains "-"
-// but no ".").
-func isCryptoSymbol(input string) bool {
-	return strings.Contains(input, "-") && !strings.Contains(input, ".")
-}
-
-// buildCrypto builds a Symbol for a crypto pair.
-func buildCrypto(input string) *Symbol {
-	code := strings.ToUpper(input)
-	return buildSymbol(code, MarketCrypto)
-}
-
-// splitSymbol splits a dotted symbol into (code, market).
-// Supports both "CODE.MARKET" (e.g. "700.HK") and moomoo-format
-// "MARKET.CODE" (e.g. "HK.09988") by checking whether the left
-// side is a known market prefix.
-func splitSymbol(input string) (string, string) {
+// splitSymbol splits a moomoo-format symbol into (code, market).
+func splitSymbol(input string) (string, string, error) {
 	idx := strings.LastIndex(input, ".")
-	if idx < 0 {
-		return input, ""
+	if idx <= 0 || idx == len(input)-1 {
+		return "", "", fmt.Errorf("symbol must use MARKET.CODE format, for example HK.00700 or US.AAPL")
 	}
 	left, right := input[:idx], input[idx+1:]
-	if knownMarkets[strings.ToUpper(left)] {
-		return right, left
+	market := strings.ToUpper(left)
+	if !knownMarkets[market] {
+		return "", "", fmt.Errorf("unsupported symbol market %q; use MARKET.CODE format", left)
 	}
-	return left, right
-}
-
-// inferMarket determines the default market based on the code format.
-// Pure digits default to HK; anything else defaults to US.
-func inferMarket(code string) string {
-	if isAllDigits(code) {
-		return MarketHK
-	}
-	return MarketUS
+	return right, market, nil
 }
 
 // isAllDigits returns true if s consists entirely of ASCII digits.
@@ -153,12 +123,16 @@ func buildSymbol(code, market string) *Symbol {
 	return &Symbol{
 		Code:   code,
 		Market: market,
-		Full:   code + "." + market,
+		Full:   market + "." + code,
 	}
 }
 
-// APICode returns the symbol in moomoo API format: "MARKET.CODE"
-// (e.g. "HK.09988", "US.AAPL").
+// FutuCode returns the symbol in moomoo API format: "MARKET.CODE".
+func (s *Symbol) FutuCode() string {
+	return s.Full
+}
+
+// APICode returns the symbol in moomoo API format: "MARKET.CODE".
 func (s *Symbol) APICode() string {
-	return s.Market + "." + s.Code
+	return s.FutuCode()
 }

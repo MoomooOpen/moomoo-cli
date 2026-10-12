@@ -131,7 +131,8 @@ func NotifyIfAvailable(currentVersion string) {
 		return
 	}
 	if newer, err := isVersionNewer(latest, currentVersion); err == nil && newer {
-		fmt.Fprintf(os.Stderr, "New version %s is available, run `moomoo update` to update.\n", latest)
+		fmt.Fprintf(os.Stderr, "New version is available: %s -> %s. Run `moomoo update` to update.\n",
+			normalizeVersion(currentVersion), latest)
 		if url := releaseNotesURLForVersion(latest); len(url) > 0 {
 			fmt.Fprintf(os.Stderr, "Release notes: %s\n", url)
 		}

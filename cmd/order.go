@@ -16,7 +16,6 @@ import (
 
 	"github.com/MoomooOpen/moomoo-cli/internal/output"
 	"github.com/MoomooOpen/moomoo-cli/internal/service"
-	"github.com/MoomooOpen/moomoo-cli/pkg/symbol"
 )
 
 // Order side constants.
@@ -147,7 +146,7 @@ var orderCmd = &cobra.Command{
 var orderBuyCmd = &cobra.Command{
 	Use:   "buy <symbol> <qty>",
 	Short: "Place a buy order",
-	Long:  "Place a securities buy order, including limit and market orders.",
+	Long:  "Place a securities buy order, including limit and market orders. Symbol must use MARKET.CODE format, for example HK.00700 or US.AAPL.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPlaceOrder(cmd, args, orderSideBuy)
@@ -157,7 +156,7 @@ var orderBuyCmd = &cobra.Command{
 var orderSellCmd = &cobra.Command{
 	Use:   "sell <symbol> <qty>",
 	Short: "Place a sell order",
-	Long:  "Place a securities sell order, including limit and market orders.",
+	Long:  "Place a securities sell order, including limit and market orders. Symbol must use MARKET.CODE format, for example HK.00700 or US.AAPL.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPlaceOrder(cmd, args, orderSideSell)
@@ -215,7 +214,7 @@ var orderDetailCmd = &cobra.Command{
 var orderMaxQtyCmd = &cobra.Command{
 	Use:   "max-qty <symbol>",
 	Short: "Query maximum tradable quantity",
-	Long:  "Query maximum cash buy, margin buy, position sell, short sell, and buy-back quantities.",
+	Long:  "Query maximum cash buy, margin buy, position sell, short sell, and buy-back quantities. Symbol must use MARKET.CODE format, for example HK.00700 or US.AAPL.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runMaxOrderQty,
 }
@@ -247,7 +246,7 @@ func registerSellFlags(cmd *cobra.Command) {
 
 func registerGenericPlaceFlags(cmd *cobra.Command) {
 	registerPlaceFlags(cmd)
-	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Security symbol (default: empty; required for non-multi-leg orders)")
+	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", securitySymbolUsage+" (default: empty; required for non-multi-leg orders)")
 	cmd.Flags().StringVar(&orderFlags.side, "side", "", "Order side: BUY, SELL, SELL_SHORT, BUY_BACK (required; default: empty)")
 	_ = cmd.MarkFlagRequired("side")
 }
@@ -278,7 +277,7 @@ func registerHistoryOrderFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "Market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
 	cmd.Flags().Int64Var(&orderFlags.start, "start", 0, "Start time as a microsecond timestamp (default: unrestricted)")
 	cmd.Flags().Int64Var(&orderFlags.end, "end", 0, "End time as a microsecond timestamp (default: unrestricted)")
-	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Filter by security symbol (default: no filter)")
+	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Filter by "+securitySymbolUsage+" (default: no filter)")
 	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Results per page, range 10-100 (default: 50)")
 }
 
@@ -413,11 +412,7 @@ func parsePlaceOrderSymbol(rawSymbol, orderClass string) (string, error) {
 		}
 		return "", fmt.Errorf("symbol is required for non-multi-leg orders")
 	}
-	sym, err := symbol.Parse(rawSymbol)
-	if err != nil {
-		return "", fmt.Errorf("parsing symbol: %w", err)
-	}
-	return sym.APICode(), nil
+	return normalizeSecuritySymbol(rawSymbol)
 }
 
 func parseMultiLegInfo(value string) (json.RawMessage, error) {
@@ -700,12 +695,16 @@ func buildHistoryOrdersRequest() (service.HistoryOrdersRequest, error) {
 	if len(account) == 0 {
 		return service.HistoryOrdersRequest{}, fmt.Errorf("account ID is required; use --account or configure default_account")
 	}
+	symbol, market, err := normalizeOptionalSecuritySymbolWithMarket(orderFlags.symbol, orderFlags.market)
+	if err != nil {
+		return service.HistoryOrdersRequest{}, err
+	}
 	return service.HistoryOrdersRequest{
 		Account:  account,
-		Market:   strings.TrimSpace(orderFlags.market),
+		Market:   market,
 		Start:    orderFlags.start,
 		End:      orderFlags.end,
-		Symbol:   strings.TrimSpace(orderFlags.symbol),
+		Symbol:   symbol,
 		PageSize: orderFlags.pageSize,
 	}, nil
 }
@@ -761,9 +760,9 @@ func runMaxOrderQty(cmd *cobra.Command, args []string) error {
 }
 
 func buildTradingInfoRequest(rawSymbol string) (service.TradingInfoRequest, error) {
-	sym, err := symbol.Parse(rawSymbol)
+	symbol, err := normalizeSecuritySymbol(rawSymbol)
 	if err != nil {
-		return service.TradingInfoRequest{}, fmt.Errorf("parsing symbol: %w", err)
+		return service.TradingInfoRequest{}, err
 	}
 	account := resolveAccount(orderFlags.account)
 	if len(account) == 0 {
@@ -779,7 +778,7 @@ func buildTradingInfoRequest(rawSymbol string) (service.TradingInfoRequest, erro
 	}
 	return service.TradingInfoRequest{
 		Account:   account,
-		Code:      sym.APICode(),
+		Code:      symbol,
 		OrderType: orderType,
 		Price:     price,
 		OrderID:   strings.TrimSpace(orderFlags.orderID),

@@ -8,13 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"github.com/MoomooOpen/moomoo-cli/internal/config"
 )
 
 const (
 	expectedRootCommandName = "moomoo"
 	expectedZshCompletion   = `"${fpath[1]}/_moomoo"`
+	legacyZshCompletion     = `"${fpath[1]}/_futu"`
 )
 
 func TestRootCommandUsesMoomooBrand(t *testing.T) {
@@ -52,36 +51,27 @@ func TestCompletionInstructionsUseMoomooZshFilename(t *testing.T) {
 	if !strings.Contains(completionCmd.Long, expectedZshCompletion) {
 		t.Fatalf("completion instructions do not contain %q", expectedZshCompletion)
 	}
-}
-
-func TestConfigListHidesInternalKeys(t *testing.T) {
-	hiddenKeys := map[string]bool{
-		config.KeyTokenFile:  true,
-		config.KeyTelemetry:  true,
-		config.KeyReportHost: true,
-	}
-	for _, key := range allConfigKeys {
-		if hiddenKeys[key] {
-			t.Fatalf("internal config key %q must not appear in config list", key)
-		}
+	if strings.Contains(completionCmd.Long, legacyZshCompletion) {
+		t.Fatalf("completion instructions still contain legacy filename %q", legacyZshCompletion)
 	}
 }
 
 func TestMetadataCommandsDoNotRequireConfig(t *testing.T) {
 	oldCfg := cfg
-	oldReporter := reporter
+	oldReporter := requestReporter
 	defer func() {
+		flushRequestReporter()
 		cfg = oldCfg
-		reporter = oldReporter
+		requestReporter = oldReporter
 	}()
 	cfg = nil
-	reporter = nil
+	requestReporter = nil
 
 	for _, command := range []*cobra.Command{versionCmd, completionCmd, updateCmd} {
 		if err := initSharedState(command); err != nil {
 			t.Fatalf("initSharedState(%s) error = %v", command.Name(), err)
 		}
-		if cfg != nil || reporter != nil {
+		if cfg != nil {
 			t.Fatalf("%s initialized config-dependent state", command.Name())
 		}
 	}
@@ -91,8 +81,17 @@ func TestReportSourceHeaderValueForMoomoo(t *testing.T) {
 	previous := reportSourceMode
 	t.Cleanup(func() { reportSourceMode = previous })
 
-	reportSourceMode = reportSourceModeCLI
+	reportSourceMode = ""
 	got, err := reportSourceHeaderValue()
+	if err != nil {
+		t.Fatalf("default reportSourceHeaderValue() error = %v", err)
+	}
+	if got != reportSourceMoomooCLI {
+		t.Fatalf("default report source = %q, want %q", got, reportSourceMoomooCLI)
+	}
+
+	reportSourceMode = reportSourceModeCLI
+	got, err = reportSourceHeaderValue()
 	if err != nil {
 		t.Fatalf("reportSourceHeaderValue() error = %v", err)
 	}
@@ -110,13 +109,17 @@ func TestReportSourceHeaderValueForMoomoo(t *testing.T) {
 	}
 }
 
-func TestReportSourceHeaderValueRejectsInvalidMode(t *testing.T) {
+func TestReportSourceHeaderValueFallsBackToCLI(t *testing.T) {
 	previous := reportSourceMode
 	t.Cleanup(func() { reportSourceMode = previous })
 
 	reportSourceMode = "unknown"
-	if _, err := reportSourceHeaderValue(); err == nil {
-		t.Fatal("expected invalid report source error")
+	got, err := reportSourceHeaderValue()
+	if err != nil {
+		t.Fatalf("reportSourceHeaderValue() error = %v", err)
+	}
+	if got != reportSourceMoomooCLI {
+		t.Fatalf("invalid report source fallback = %q, want %q", got, reportSourceMoomooCLI)
 	}
 }
 
@@ -195,6 +198,8 @@ func TestExtractInternalInvocationArgs(t *testing.T) {
 		{name: "source equals middle", args: []string{"order", "--source=skill", "detail", "O1"}, wantSource: reportSourceModeSkill},
 		{name: "source equals end", args: []string{"order", "detail", "O1", "--source=skill"}, wantSource: reportSourceModeSkill},
 		{name: "source and agent split end", args: []string{"order", "detail", "O1", "--source", "skill", "--agent", "codex"}, wantSource: reportSourceModeSkill, wantAgent: agentNameCodex},
+		{name: "invalid source split falls back", args: []string{"--source", "unknown", "order", "detail", "O1"}, wantSource: reportSourceModeCLI},
+		{name: "invalid source equals falls back", args: []string{"order", "--source=unknown", "detail", "O1"}, wantSource: reportSourceModeCLI},
 		{name: "agent equals normalizes hyphen", args: []string{"order", "detail", "O1", "--agent=claude-code"}, wantAgent: agentNameClaudeCode},
 	}
 
@@ -242,8 +247,6 @@ func TestExtractInternalInvocationArgsRejectsMalformedMarker(t *testing.T) {
 		{name: "missing value", args: []string{"version", "--source"}},
 		{name: "empty equals value", args: []string{"version", "--source="}},
 		{name: "missing value before flag", args: []string{"--source", "--format", "json", "version"}},
-		{name: "invalid split value", args: []string{"--source", "unknown", "version"}},
-		{name: "invalid equals value", args: []string{"version", "--source=unknown"}},
 		{name: "duplicate split", args: []string{"--source", "skill", "version", "--source", "cli"}},
 		{name: "duplicate equals", args: []string{"--source=skill", "version", "--source=cli"}},
 		{name: "duplicate mixed", args: []string{"--source", "skill", "version", "--source=cli"}},

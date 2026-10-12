@@ -41,7 +41,7 @@ func TestBuildPlaceOrderRequestDefaultsToMarketOrder(t *testing.T) {
 		multiLegInfo string
 	}{typ: defaultOrderType, timeInForce: defaultTimeInForce}
 
-	req, err := buildPlaceOrderRequest("AAPL", "10", orderSideBuy)
+	req, err := buildPlaceOrderRequest("US.AAPL", "10", orderSideBuy)
 	if err != nil {
 		t.Fatalf("buildPlaceOrderRequest() error = %v", err)
 	}
@@ -50,6 +50,61 @@ func TestBuildPlaceOrderRequestDefaultsToMarketOrder(t *testing.T) {
 	}
 	if req.Account != "account-1" || req.Code != "US.AAPL" || req.Side != orderSideBuy || req.Qty != 10 {
 		t.Fatalf("request identity = %#v", req)
+	}
+}
+
+func TestBuildPlaceOrderRequestNormalizesHKSymbol(t *testing.T) {
+	oldFlags := orderFlags
+	oldCfg := cfg
+	defer func() {
+		orderFlags = oldFlags
+		cfg = oldCfg
+	}()
+	cfg = &config.Config{DefaultAcct: "account-1"}
+	orderFlags = struct {
+		price        string
+		auxPrice     string
+		qty          int64
+		typ          string
+		account      string
+		exchange     string
+		orderID      string
+		market       string
+		pageSize     int
+		start        int64
+		end          int64
+		symbol       string
+		side         string
+		timeInForce  string
+		lotType      string
+		remark       string
+		session      string
+		orderClass   string
+		multiLegInfo string
+	}{typ: defaultOrderType, timeInForce: defaultTimeInForce}
+
+	req, err := buildPlaceOrderRequest("HK.700", "10", orderSideBuy)
+	if err != nil {
+		t.Fatalf("buildPlaceOrderRequest() error = %v", err)
+	}
+	if req.Code != "HK.00700" {
+		t.Fatalf("code = %q, want HK.00700", req.Code)
+	}
+}
+
+func TestBuildHistoryOrdersRequestNormalizesSymbolFilter(t *testing.T) {
+	oldFlags := orderFlags
+	defer func() { orderFlags = oldFlags }()
+	orderFlags.account = "account-1"
+	orderFlags.market = "US"
+	orderFlags.symbol = "HK.700"
+
+	req, err := buildHistoryOrdersRequest()
+	if err != nil {
+		t.Fatalf("buildHistoryOrdersRequest() error = %v", err)
+	}
+	if req.Symbol != "HK.00700" || req.Market != "HK" {
+		t.Fatalf("symbol = %q, market = %q; want HK.00700, HK", req.Symbol, req.Market)
 	}
 }
 

@@ -435,7 +435,7 @@ func (d Deal) MarshalJSON() ([]byte, error) {
 
 // Account represents a trading account.
 type Account struct {
-	UserID                string `json:"futu_id"`
+	FutuID                string `json:"futu_id"`
 	AccountID             string `json:"account_id"`
 	AccountNo             string `json:"account_card_number"`
 	UniversalAccountNo    string `json:"univs_account_card_number"`
@@ -449,7 +449,7 @@ type Account struct {
 }
 
 type accountWire struct {
-	UserID                string          `json:"futu_id"`
+	FutuID                string          `json:"futu_id"`
 	AccountID             json.RawMessage `json:"account_id"`
 	AccountNo             json.RawMessage `json:"account_card_number"`
 	UniversalAccountNo    json.RawMessage `json:"univs_account_card_number"`
@@ -481,7 +481,7 @@ func (a *Account) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("decode univs_account_card_number: %w", err)
 	}
 	*a = Account{
-		UserID: wire.UserID, AccountID: accountID, AccountNo: accountNo,
+		FutuID: wire.FutuID, AccountID: accountID, AccountNo: accountNo,
 		UniversalAccountNo: universalAccountNo, MemberID: wire.MemberID,
 		Type: wire.Type, Channel: wire.Channel,
 		AccountChannel: wire.AccountChannel, SecurityFirm: wire.SecurityFirm,

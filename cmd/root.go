@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/MoomooOpen/moomoo-cli/internal/analytics"
 	"github.com/MoomooOpen/moomoo-cli/internal/auth"
 	"github.com/MoomooOpen/moomoo-cli/internal/client"
 	"github.com/MoomooOpen/moomoo-cli/internal/config"
@@ -30,10 +28,19 @@ const (
 )
 
 const (
+	quoteGroupID = "quote"
+	simGroupID   = "sim"
+)
+
+const (
 	reportSourceModeCLI     = "cli"
 	reportSourceModeSkill   = "skill"
 	reportSourceMoomooCLI   = "6"
 	reportSourceMoomooSkill = "8"
+	reportPlatformMoomoo    = "moomoo"
+	commandReportToolID     = "cli_command"
+	commandOutcomeSuccess   = "success"
+	commandOutcomeFailure   = "failure"
 	internalSourceFlag      = "--source"
 	internalSourcePrefix    = "--source="
 	internalAgentFlag       = "--agent"
@@ -50,9 +57,6 @@ const (
 	envClaudeCodeSession    = "CLAUDE_CODE_SESSION_ID"
 	envClaudeCodeEntrypoint = "CLAUDE_CODE_ENTRYPOINT"
 )
-
-// Analytics endpoint path.
-const analyticsEndpoint = "/v1/analytics/cli"
 
 // Unix timestamp magnitude thresholds.
 const (
@@ -74,10 +78,9 @@ var (
 	quoteSvc         *service.QuoteService
 	tradeSvc         *service.TradeService
 	cryptoSvc        *service.CryptoService
-	web3Svc          *service.Web3Service
-	reporter         *analytics.Reporter
 	requestReporter  *reporting.Reporter
 	cmdStartTime     time.Time
+	activeCommand    *cobra.Command
 )
 
 var (
@@ -118,9 +121,10 @@ var noConfigCommands = map[string]bool{
 var rootCmd = &cobra.Command{
 	Use:   "moomoo",
 	Short: "moomoo command-line interface",
-	Long:  "moomoo CLI V1: REST API access for market data, trading, and Web3.",
+	Long:  "moomoo CLI V1: REST API access for market data, trading, and crypto.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cmdStartTime = time.Now()
+		activeCommand = cmd
 		return initSharedState(cmd)
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
@@ -138,20 +142,27 @@ func Execute() error {
 	agentName = internal.agent
 	rootCmd.SetArgs(args)
 	defer flushRequestReporter()
-	return rootCmd.Execute()
+	err = rootCmd.Execute()
+	if err != nil {
+		reportCommandExecution(activeCommand, commandOutcomeFailure, err)
+	}
+	return err
 }
 
 func init() {
+	rootCmd.AddGroup(&cobra.Group{ID: quoteGroupID, Title: "Quote Commands:"})
+	rootCmd.AddGroup(&cobra.Group{ID: simGroupID, Title: "Sim Trade Commands:"})
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", formatTable,
 		"Output format: table or json (default: table)")
 	rootCmd.PersistentFlags().StringVar(&tokenFile, "token-file", "",
-		"Path to an alternate encrypted OAuth token file")
+		"Path to the encrypted OAuth token file (default: token_file from config)")
 }
 
 // initSharedState loads config, ensures auth (when needed), and initializes
-// the HTTP client, services, and analytics reporter.
+// the HTTP client and services.
 func initSharedState(cmd *cobra.Command) error {
 	if commandOrParentMatches(cmd, noConfigCommands) {
+		newRequestReporter("")
 		return nil
 	}
 	var err error
@@ -160,14 +171,11 @@ func initSharedState(cmd *cobra.Command) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	reporter = analytics.NewReporter(
-		cfg.APIBase+analyticsEndpoint,
-		cfg.Telemetry,
-	)
 	if cfg.AutoUpdate {
 		update.RefreshCacheIfStale(Version)
 	}
 
+	newRequestReporter("")
 	if requiresAuth(cmd) {
 		return initAuthenticatedClient()
 	}
@@ -201,8 +209,11 @@ func initOAuthClient() error {
 	if len(cfg.ClientID) == 0 {
 		return fmt.Errorf("client_id is not configured\nRun 'moomoo config init' to register an OAuth client")
 	}
+	if !clientIDMatchesCurrentAPIBase() {
+		return fmt.Errorf("client_id is not bound to current api_base %s\nRun 'moomoo auth login' to register a new OAuth client", currentAPIBase())
+	}
 
-	token, err := auth.EnsureValid(cfg.ClientID, effectiveTokenFile())
+	token, err := auth.EnsureValidWithBase(currentAPIBase(), cfg.ClientID, effectiveTokenFile())
 	if err != nil {
 		return fmt.Errorf("authentication required: %w\nRun 'moomoo auth login' to authenticate", err)
 	}
@@ -211,12 +222,12 @@ func initOAuthClient() error {
 		return err
 	}
 	httpClient = client.New(
-		cfg.APIBase,
+		currentAPIBase(),
 		client.WithToken(token),
 		client.WithClientName(auth.BuildClientName("")),
 		client.WithVersion(Version),
 		client.WithReportSource(reportSource),
-		client.WithReportMetadata("moomoo", effectiveAgentName()),
+		client.WithReportMetadata(reportPlatformMoomoo, effectiveAgentName()),
 		client.WithRequestReporter(newRequestReporter(token)),
 	)
 	initServices()
@@ -224,10 +235,10 @@ func initOAuthClient() error {
 }
 
 func newRequestReporter(token string) *reporting.Reporter {
+	flushRequestReporter()
 	requestReporter = reporting.NewReporter(reporting.Options{
-		Enabled: cfg.Telemetry,
-		Host:    cfg.ReportHost,
-		Token:   token,
+		Host:  reporting.DefaultHost,
+		Token: token,
 	})
 	return requestReporter
 }
@@ -240,16 +251,23 @@ func reportSourceHeaderValue() (string, error) {
 	case reportSourceModeSkill:
 		return reportSourceMoomooSkill, nil
 	default:
-		return "", fmt.Errorf("invalid report source %q: supported values are %s and %s",
-			mode, reportSourceModeCLI, reportSourceModeSkill)
+		return reportSourceMoomooCLI, nil
 	}
 }
 
 func effectiveReportSourceMode() string {
-	if len(reportSourceMode) > 0 {
-		return reportSourceMode
+	return normalizeReportSourceMode(reportSourceMode)
+}
+
+func normalizeReportSourceMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case reportSourceModeSkill:
+		return reportSourceModeSkill
+	case reportSourceModeCLI:
+		return reportSourceModeCLI
+	default:
+		return reportSourceModeCLI
 	}
-	return reportSourceModeCLI
 }
 
 func effectiveAgentName() string {
@@ -344,11 +362,7 @@ func applyInternalArg(arg, value string, internal *internalInvocationArgs, found
 		if *foundSource {
 			return fmt.Errorf("%s may only be specified once", internalSourceFlag)
 		}
-		if value != reportSourceModeCLI && value != reportSourceModeSkill {
-			return fmt.Errorf("invalid report source %q: supported values are %s and %s",
-				value, reportSourceModeCLI, reportSourceModeSkill)
-		}
-		internal.source = value
+		internal.source = normalizeReportSourceMode(value)
 		*foundSource = true
 	case internalAgentFlag:
 		normalized, err := normalizeAgentName(value)
@@ -387,29 +401,50 @@ func initServices() {
 	quoteSvc = service.NewQuoteService(httpClient)
 	tradeSvc = service.NewTradeService(httpClient)
 	cryptoSvc = service.NewCryptoService(httpClient)
-	web3Svc = service.NewWeb3Service(httpClient)
 }
 
-// reportAndCheckUpdate sends analytics and prints an update notice if available.
+// reportAndCheckUpdate flushes request reporting and prints an update notice if available.
 func reportAndCheckUpdate(cmd *cobra.Command) {
 	defer flushRequestReporter()
-
-	if reporter != nil {
-		reporter.Report(analytics.Event{
-			Command:    cmd.Name(),
-			Outcome:    "success",
-			DurationMs: time.Since(cmdStartTime).Milliseconds(),
-			Version:    Version,
-			OS:         runtime.GOOS,
-			Arch:       runtime.GOARCH,
-			AgentName:  effectiveAgentName(),
-		})
-	}
+	reportCommandExecution(cmd, commandOutcomeSuccess, nil)
 
 	if cfg != nil && cfg.AutoUpdate && !isJSONOutput() {
 		update.NotifyIfAvailable(Version)
 		update.NotifyReleaseNotesIfVersionChanged(Version)
 	}
+}
+
+func reportCommandExecution(cmd *cobra.Command, outcome string, commandErr error) {
+	if requestReporter == nil || cmd == nil {
+		return
+	}
+	reportSource, err := reportSourceHeaderValue()
+	if err != nil {
+		return
+	}
+	errorText := ""
+	if commandErr != nil {
+		errorText = commandErr.Error()
+	}
+	event := reporting.BuildEvent(reporting.BuildInput{
+		Source:     reportSource,
+		AgentName:  effectiveAgentName(),
+		Platform:   reportPlatformMoomoo,
+		Command:    cmd.CommandPath(),
+		DurationMs: commandDurationMillis(),
+		Error:      errorText,
+		Version:    Version,
+	})
+	event.ToolID = commandReportToolID
+	event.Outcome = outcome
+	requestReporter.Report(event)
+}
+
+func commandDurationMillis() int64 {
+	if cmdStartTime.IsZero() {
+		return 0
+	}
+	return time.Since(cmdStartTime).Milliseconds()
 }
 
 func flushRequestReporter() {

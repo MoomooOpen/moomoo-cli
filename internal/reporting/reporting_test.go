@@ -80,6 +80,14 @@ func TestBuildEventGeneratesUniqueTraceID(t *testing.T) {
 	}
 }
 
+func TestReportURLUsesProductionDefaultHost(t *testing.T) {
+	got := ReportURL("")
+	want := "https://ai-report.moomoo.com/agent_report/call"
+	if got != want {
+		t.Fatalf("ReportURL(\"\") = %q, want %q", got, want)
+	}
+}
+
 func TestReporterPostsEventWithBearerToken(t *testing.T) {
 	received := make(chan reportToolCallRequest, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +104,6 @@ func TestReporterPostsEventWithBearerToken(t *testing.T) {
 	defer srv.Close()
 
 	reporter := NewReporter(Options{
-		Enabled:  true,
 		Endpoint: srv.URL,
 		Token:    "token-1",
 	})
@@ -115,22 +122,4 @@ func TestReporterPostsEventWithBearerToken(t *testing.T) {
 	default:
 		t.Fatal("expected report request")
 	}
-}
-
-func TestReportURLUsesDefaultHost(t *testing.T) {
-	want := "https://report.moomoo.com/agent_report/call"
-	if got := ReportURL(""); got != want {
-		t.Fatalf("ReportURL() = %q, want %q", got, want)
-	}
-}
-
-func TestReporterEnabledWithDefaultEndpoint(t *testing.T) {
-	reporter := NewReporter(Options{Enabled: true})
-	if !reporter.enabled {
-		t.Fatal("reporter should be enabled when using the default endpoint")
-	}
-	if reporter.endpoint != "https://report.moomoo.com/agent_report/call" {
-		t.Fatalf("endpoint = %q", reporter.endpoint)
-	}
-	_ = reporter.Close(context.Background())
 }

@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/MoomooOpen/moomoo-cli/internal/reporting"
 )
 
-// OAuth mode headers.
+// ── OAuth mode headers ──────────────────────────────────────────────────────
 
 func TestSetHeaders_OAuthMode(t *testing.T) {
 	c := New("https://api.example.com",
@@ -84,61 +85,71 @@ func TestSetHeaders_CliCmdFromContext(t *testing.T) {
 	}
 }
 
-func TestTradeMutationEndpointMatrixRequiresReportSource(t *testing.T) {
-	mutatingEndpoints := []string{
-		"trade.order.place",
-		"trade.order.modify",
-		"trade.order.cancel",
-		"trade.order.confirm",
-		"crypto.order.place",
-		"crypto.order.modify",
-		"crypto.order.cancel",
-		"web3.swap.execute",
-		"web3.transfer",
+func TestCallAddsReportSourceForRequiredEndpoints(t *testing.T) {
+	tests := []struct {
+		endpoint string
+		opts     CallOpts
+	}{
+		{endpoint: "trade.order.place", opts: CallOpts{PathParams: map[string]string{"acc_id": "123"}}},
+		{endpoint: "quote.cur_kline", opts: CallOpts{PathParams: map[string]string{"symbol": "US.AAPL"}}},
+		{endpoint: "sim_trade.input_order", opts: CallOpts{PathParams: map[string]string{"acc_id": "SIM-1"}}},
 	}
-	for _, endpoint := range mutatingEndpoints {
-		if !Endpoints[endpoint].ReportSource {
-			t.Fatalf("%s must require report source header", endpoint)
-		}
-	}
+	for _, test := range tests {
+		t.Run(test.endpoint, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.Header.Get(headerReportSource); got != "source-1" {
+					t.Fatalf("%s = %q, want source-1", headerReportSource, got)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
 
-	readOnlyEndpoints := []string{
-		"quote.snapshot",
-		"trade.order.open",
-		"crypto.order.active",
-		"web3.swap.quote",
-		"web3.wallet.balance",
-	}
-	for _, endpoint := range readOnlyEndpoints {
-		if Endpoints[endpoint].ReportSource {
-			t.Fatalf("%s must not require report source header", endpoint)
-		}
+			c := New(srv.URL, WithReportSource("source-1"))
+			if err := c.Call(context.Background(), test.endpoint, test.opts, nil); err != nil {
+				t.Fatalf("Call() error = %v", err)
+			}
+		})
 	}
 }
 
-func TestCallAddsReportSourceForTradeMutations(t *testing.T) {
+func TestCallAddsReportSourceForEveryRegisteredEndpoint(t *testing.T) {
+	for endpoint, ep := range Endpoints {
+		t.Run(endpoint, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.Header.Get(headerReportSource); got != "source-1" {
+					t.Fatalf("%s = %q, want source-1", headerReportSource, got)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
+
+			c := New(srv.URL, WithReportSource("source-1"))
+			err := c.Call(context.Background(), endpoint, CallOpts{
+				PathParams: placeholderPathParams(ep.Path),
+			}, nil)
+			if err != nil {
+				t.Fatalf("Call() error = %v", err)
+			}
+		})
+	}
+}
+
+func placeholderPathParams(path string) map[string]string {
+	params := map[string]string{}
+	for _, part := range strings.Split(path, "/") {
+		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			params[strings.Trim(part, "{}")] = "value-1"
+		}
+	}
+	return params
+}
+
+func TestCallAddsReportSourceForReadOnlyEndpoints(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get(headerReportSource); got != "source-1" {
 			t.Fatalf("%s = %q, want source-1", headerReportSource, got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{}`))
-	}))
-	defer srv.Close()
-
-	c := New(srv.URL, WithReportSource("source-1"))
-	err := c.Call(context.Background(), "trade.order.place", CallOpts{
-		PathParams: map[string]string{"acc_id": "123"},
-	}, nil)
-	if err != nil {
-		t.Fatalf("Call() error = %v", err)
-	}
-}
-
-func TestCallOmitsReportSourceForReadOnlyEndpoints(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get(headerReportSource); len(got) > 0 {
-			t.Fatalf("%s = %q, want empty", headerReportSource, got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{}`))
@@ -153,7 +164,16 @@ func TestCallOmitsReportSourceForReadOnlyEndpoints(t *testing.T) {
 	}
 }
 
-// Token management.
+func TestRegisteredEndpointsHaveReportingRoutes(t *testing.T) {
+	for endpoint, ep := range Endpoints {
+		route := reporting.MatchToolRoute(ep.Method, ep.Path)
+		if route.ID == "" {
+			t.Fatalf("%s %s (%s) has no reporting route", ep.Method, ep.Path, endpoint)
+		}
+	}
+}
+
+// ── Token management ────────────────────────────────────────────────────────
 
 func TestSetToken_ReadToken(t *testing.T) {
 	c := New("https://api.example.com", WithToken("initial"))
@@ -167,7 +187,7 @@ func TestSetToken_ReadToken(t *testing.T) {
 	}
 }
 
-// Constructor.
+// ── Constructor ─────────────────────────────────────────────────────────────
 
 func TestNew_Defaults(t *testing.T) {
 	c := New("https://api.example.com/")
@@ -179,7 +199,7 @@ func TestNew_Defaults(t *testing.T) {
 	}
 }
 
-// buildURL.
+// ── buildURL ────────────────────────────────────────────────────────────────
 
 func TestBuildURL_NoQuery(t *testing.T) {
 	c := New("https://api.example.com")
@@ -197,7 +217,7 @@ func TestBuildURL_WithQuery(t *testing.T) {
 	}
 }
 
-// resolvePathParams.
+// ── resolvePathParams ───────────────────────────────────────────────────────
 
 func TestResolvePathParams(t *testing.T) {
 	got := resolvePathParams("/v1/orders/{id}/cancel", map[string]string{"id": "12345"})
@@ -213,7 +233,7 @@ func TestResolvePathParams_SpecialChars(t *testing.T) {
 	}
 }
 
-// End-to-end with httptest.
+// ── End-to-end with httptest ────────────────────────────────────────────────
 
 func TestDo_OAuthMode(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -271,9 +291,11 @@ func (r *captureReporter) Report(event reporting.Event) {
 }
 
 func TestCallReportsRequestEvent(t *testing.T) {
+	var reportSourceHeader string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reportSourceHeader = r.Header.Get(headerReportSource)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"order_id":"OID-1","price":"123"}}`))
+		_, _ = w.Write([]byte(`{"data":{"items":[]}}`))
 	}))
 	defer srv.Close()
 
@@ -285,14 +307,16 @@ func TestCallReportsRequestEvent(t *testing.T) {
 		WithVersion("v1.2.3"),
 	)
 
-	ctx := context.WithValue(context.Background(), CtxKeyCommand, "moomoo order place")
+	ctx := context.WithValue(context.Background(), CtxKeyCommand, "moomoo quote")
 	var result map[string]any
-	err := c.Call(ctx, "trade.order.place", CallOpts{
-		PathParams: map[string]string{"acc_id": "123"},
-		Body:       map[string]any{"symbol": "US.AAPL", "qty": 1},
+	err := c.Call(ctx, "quote.stock_quote", CallOpts{
+		Body: map[string]any{"code_list": []string{"US.AAPL"}},
 	}, &result)
 	if err != nil {
 		t.Fatalf("Call() error = %v", err)
+	}
+	if reportSourceHeader != "6" {
+		t.Fatalf("%s = %q, want 6", headerReportSource, reportSourceHeader)
 	}
 	if len(capture.events) != 1 {
 		t.Fatalf("captured %d events, want 1", len(capture.events))
@@ -301,20 +325,60 @@ func TestCallReportsRequestEvent(t *testing.T) {
 	if event.Source != 6 || event.AgentName != "codex" || event.Platform != "moomoo" {
 		t.Fatalf("unexpected source metadata: %+v", event)
 	}
-	if event.ToolID != "trading_order_place" {
-		t.Fatalf("tool id = %q, want trading_order_place", event.ToolID)
+	if event.ToolID != "quote_stock_quote" {
+		t.Fatalf("tool id = %q, want quote_stock_quote", event.ToolID)
 	}
-	if event.APIPathTemplate != "/api/v1.0/accounts/{acc_id}/orders" {
+	if event.APIPathTemplate != "/api/v1.0/quote/stock-quote" {
 		t.Fatalf("path template = %q", event.APIPathTemplate)
-	}
-	if event.OrderID != "OID-1" {
-		t.Fatalf("order id = %q, want OID-1", event.OrderID)
 	}
 	if event.TraceID == "" {
 		t.Fatal("trace id should not be empty")
 	}
 	if event.Version != "v1.2.3" {
 		t.Fatalf("version = %q, want v1.2.3", event.Version)
+	}
+}
+
+func TestCallReportsSimTradeRequestEvent(t *testing.T) {
+	var reportSourceHeader string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reportSourceHeader = r.Header.Get(headerReportSource)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"order_id":"SIM-OID-1"}}`))
+	}))
+	defer srv.Close()
+
+	capture := &captureReporter{}
+	c := New(srv.URL,
+		WithReportSource("8"),
+		WithReportMetadata("moomoo", "codex"),
+		WithRequestReporter(capture),
+		WithVersion("v1.2.3"),
+	)
+
+	ctx := context.WithValue(context.Background(), CtxKeyCommand, "moomoo sim order buy")
+	err := c.Call(ctx, "sim_trade.input_order", CallOpts{
+		PathParams: map[string]string{"acc_id": "SIM-1"},
+		Body:       map[string]any{"symbol": "US.AAPL", "qty": "1"},
+	}, nil)
+	if err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+	if reportSourceHeader != "8" {
+		t.Fatalf("%s = %q, want 8", headerReportSource, reportSourceHeader)
+	}
+	if len(capture.events) != 1 {
+		t.Fatalf("captured %d events, want 1", len(capture.events))
+	}
+	event := capture.events[0]
+	if event.ToolID != "sim_trade_input_order" {
+		t.Fatalf("tool id = %q, want sim_trade_input_order", event.ToolID)
+	}
+	if event.APIPathTemplate != "/api/v1.0/sim-trade/{acc_id}/orders" {
+		t.Fatalf("path template = %q", event.APIPathTemplate)
+	}
+	if event.Source != 8 {
+		t.Fatalf("source = %d, want 8", event.Source)
 	}
 }
 
@@ -347,7 +411,6 @@ func TestCallReportsThroughAsyncReporter(t *testing.T) {
 	defer businessSrv.Close()
 
 	reporter := reporting.NewReporter(reporting.Options{
-		Enabled:  true,
 		Endpoint: reportSrv.URL,
 		Token:    "oauth-token",
 	})
@@ -401,7 +464,7 @@ func TestCallReportsThroughAsyncReporter(t *testing.T) {
 	}
 }
 
-// marshalBody.
+// ── marshalBody ─────────────────────────────────────────────────────────────
 
 func TestMarshalBody_Nil(t *testing.T) {
 	b, err := marshalBody(nil)
@@ -426,7 +489,7 @@ func TestMarshalBody_Struct(t *testing.T) {
 	}
 }
 
-// commandFromCtx.
+// ── commandFromCtx ──────────────────────────────────────────────────────────
 
 func TestCommandFromCtx_Set(t *testing.T) {
 	ctx := context.WithValue(context.Background(), CtxKeyCommand, "moomoo quote")

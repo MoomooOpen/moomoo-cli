@@ -41,7 +41,7 @@ var positionCmd = &cobra.Command{
 
 func init() {
 	positionCmd.Flags().StringP("account", "a", "", "Trading account ID (default: configured default_account)")
-	positionCmd.Flags().String("symbol", "", "Filter by security symbol, for example US.AAPL (default: no filter)")
+	positionCmd.Flags().String("symbol", "", "Filter by "+securitySymbolUsage+" (default: no filter)")
 	positionCmd.Flags().String("pl-ratio-min", "", "Minimum profit/loss ratio, for example -0.1 means at least -10% (default: no filter)")
 	positionCmd.Flags().String("pl-ratio-max", "", "Maximum profit/loss ratio, for example 0.2 means at most +20% (default: no filter)")
 	rootCmd.AddCommand(positionCmd)
@@ -49,34 +49,12 @@ func init() {
 
 // runPosition is the top-level handler for the position command.
 func runPosition(cmd *cobra.Command, _ []string) error {
-	account, err := cmd.Flags().GetString("account")
+	account, filter, err := buildPositionRequest(cmd)
 	if err != nil {
-		return fmt.Errorf("reading account flag: %w", err)
-	}
-	symbol, err := cmd.Flags().GetString("symbol")
-	if err != nil {
-		return fmt.Errorf("reading symbol flag: %w", err)
-	}
-	plRatioMin, err := cmd.Flags().GetString("pl-ratio-min")
-	if err != nil {
-		return fmt.Errorf("reading pl-ratio-min flag: %w", err)
-	}
-	plRatioMax, err := cmd.Flags().GetString("pl-ratio-max")
-	if err != nil {
-		return fmt.Errorf("reading pl-ratio-max flag: %w", err)
-	}
-
-	account = resolveAccount(account)
-	if len(account) == 0 {
-		return fmt.Errorf("account ID is required; use --account or configure default_account")
+		return err
 	}
 
 	ctx := cmdContext(cmd)
-	filter := service.PositionFilter{
-		Code:       symbol,
-		PLRatioMin: plRatioMin,
-		PLRatioMax: plRatioMax,
-	}
 	positions, err := tradeSvc.GetPositions(ctx, account, filter)
 	if err != nil {
 		return fmt.Errorf("fetching positions: %w", err)
@@ -86,6 +64,42 @@ func runPosition(cmd *cobra.Command, _ []string) error {
 		renderPositionTable(positions)
 	})
 	return nil
+}
+
+func buildPositionRequest(cmd *cobra.Command) (string, service.PositionFilter, error) {
+	account, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return "", service.PositionFilter{}, fmt.Errorf("reading account flag: %w", err)
+	}
+	symbol, err := cmd.Flags().GetString("symbol")
+	if err != nil {
+		return "", service.PositionFilter{}, fmt.Errorf("reading symbol flag: %w", err)
+	}
+	plRatioMin, err := cmd.Flags().GetString("pl-ratio-min")
+	if err != nil {
+		return "", service.PositionFilter{}, fmt.Errorf("reading pl-ratio-min flag: %w", err)
+	}
+	plRatioMax, err := cmd.Flags().GetString("pl-ratio-max")
+	if err != nil {
+		return "", service.PositionFilter{}, fmt.Errorf("reading pl-ratio-max flag: %w", err)
+	}
+
+	account = resolveAccount(account)
+	if len(account) == 0 {
+		return "", service.PositionFilter{}, fmt.Errorf("account ID is required; use --account or configure default_account")
+	}
+
+	normalizedSymbol, err := normalizeOptionalSecuritySymbol(symbol)
+	if err != nil {
+		return "", service.PositionFilter{}, err
+	}
+
+	filter := service.PositionFilter{
+		Code:       normalizedSymbol,
+		PLRatioMin: plRatioMin,
+		PLRatioMax: plRatioMax,
+	}
+	return account, filter, nil
 }
 
 // renderPositionTable writes position data as a formatted table to stdout.

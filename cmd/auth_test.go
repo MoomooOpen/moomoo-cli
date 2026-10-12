@@ -13,8 +13,10 @@ import (
 func TestEnsureClientIDReusesStoredRegistration(t *testing.T) {
 	previousConfig := cfg
 	cfg = &config.Config{
-		ClientID:    "stored-client-id",
-		RedirectURI: "http://127.0.0.1:18888/callback",
+		APIBase:         config.DefaultAPIBase,
+		ClientID:        "stored-client-id",
+		ClientIDAPIBase: config.DefaultAPIBase,
+		RedirectURI:     "http://127.0.0.1:18888/callback",
 	}
 	t.Cleanup(func() { cfg = previousConfig })
 
@@ -27,13 +29,73 @@ func TestEnsureClientIDReusesStoredRegistration(t *testing.T) {
 	}
 }
 
+func TestClientIDDoesNotMatchWithoutAPIBaseBinding(t *testing.T) {
+	previousConfig := cfg
+	cfg = &config.Config{
+		APIBase:     config.DefaultAPIBase,
+		ClientID:    "stored-client-id",
+		RedirectURI: "http://127.0.0.1:18888/callback",
+	}
+	t.Cleanup(func() { cfg = previousConfig })
+
+	if clientIDMatchesCurrentAPIBase() {
+		t.Fatal("client ID without API base binding must not match")
+	}
+}
+
+func TestClientIDDoesNotMatchDifferentAPIBase(t *testing.T) {
+	previousConfig := cfg
+	cfg = &config.Config{
+		APIBase:         "https://webapi.moomoo.com",
+		ClientID:        "stored-client-id",
+		ClientIDAPIBase: "https://sandbox.moomoo.com",
+		RedirectURI:     "http://127.0.0.1:18888/callback",
+	}
+	t.Cleanup(func() { cfg = previousConfig })
+
+	if clientIDMatchesCurrentAPIBase() {
+		t.Fatal("client ID bound to another API base must not match")
+	}
+}
+
+func TestRegisterAndSaveClientIDStoresAPIBaseBinding(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	previousConfig := cfg
+	previousRegister := registerOAuthClient
+	cfg = &config.Config{
+		APIBase:   "https://sandbox.moomoo.com/",
+		TokenFile: t.TempDir() + "/token.json",
+	}
+	registerOAuthClient = func(baseURL, clientName string, redirectURIs []string) (*auth.RegistrationResponse, error) {
+		if baseURL != "https://sandbox.moomoo.com" {
+			t.Fatalf("baseURL = %q, want normalized sandbox base", baseURL)
+		}
+		return &auth.RegistrationResponse{ClientID: "new-client-id"}, nil
+	}
+	t.Cleanup(func() {
+		cfg = previousConfig
+		registerOAuthClient = previousRegister
+	})
+
+	clientID, err := registerAndSaveClientID([]string{"http://127.0.0.1:18888/callback"})
+	if err != nil {
+		t.Fatalf("registerAndSaveClientID() error = %v", err)
+	}
+	if clientID != "new-client-id" {
+		t.Fatalf("clientID = %q, want new-client-id", clientID)
+	}
+	if cfg.ClientIDAPIBase != "https://sandbox.moomoo.com" {
+		t.Fatalf("ClientIDAPIBase = %q, want sandbox base", cfg.ClientIDAPIBase)
+	}
+}
+
 func TestNewAuthStatusValidToken(t *testing.T) {
 	now := time.Now()
 	store := &auth.TokenStore{
 		LoggedInAt: now.Add(-time.Hour), ExpiresAt: now.Add(time.Hour),
 		ClientName: "test-client",
 		Account: auth.AccountInfo{
-			UserID:      "moomoo-1",
+			FutuID:      "moomoo-1",
 			MemberID:    "member-1",
 			AccountNo:   "account-1",
 			AccountID:   "account-id-1",
@@ -54,7 +116,7 @@ func TestNewAuthStatusValidToken(t *testing.T) {
 	if status.Account.AccountID != "account-id-1" || status.Account.AccountType != "margin" {
 		t.Fatalf("non-sensitive account fields were not preserved: %#v", status.Account)
 	}
-	if status.Account.UserID != "" || status.Account.MemberID != "" || status.Account.AccountNo != "" {
+	if status.Account.FutuID != "" || status.Account.MemberID != "" || status.Account.AccountNo != "" {
 		t.Fatalf("sensitive user IDs must not be exposed: %#v", status.Account)
 	}
 	if len(status.QuotePermissions) != 2 {
@@ -66,7 +128,7 @@ func TestNewAuthStatusOmitsAccountWithOnlyUserIdentifiers(t *testing.T) {
 	store := &auth.TokenStore{
 		ExpiresAt: time.Now().Add(time.Hour),
 		Account: auth.AccountInfo{
-			UserID:    "moomoo-1",
+			FutuID:    "moomoo-1",
 			MemberID:  "member-1",
 			AccountNo: "account-1",
 		},

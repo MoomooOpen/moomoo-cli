@@ -69,7 +69,7 @@ func TestGeneratePKCE_Unique(t *testing.T) {
 
 func TestComputeS256Challenge_KnownVector(t *testing.T) {
 	// RFC 7636 Appendix B example (adapted):
-	// verifier "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk" ->
+	// verifier "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk" →
 	// challenge "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 	verifier := "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 	got := computeS256Challenge(verifier)

@@ -13,7 +13,9 @@ import (
 var allConfigKeys = []string{
 	config.KeyAPIBase,
 	config.KeyClientID,
+	config.KeyClientIDAPI,
 	config.KeyRedirectURI,
+	config.KeyTokenFile,
 	config.KeyDefaultAcct,
 	config.KeyAutoUpdate,
 }

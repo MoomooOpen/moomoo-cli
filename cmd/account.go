@@ -26,12 +26,12 @@ const (
 )
 
 const (
-	securityFirmMoomooHK = "FUTUSECURITIES"
-	securityFirmMoomooSG = "FUTUSG"
-	securityFirmMoomooUS = "FUTUINC"
-	securityFirmMoomooCA = "FUTUCA"
-	securityFirmMoomooMY = "FUTUMY"
-	securityFirmMoomooAU = "FUTUAU"
+	securityFirmFutuSecurities = "FUTUSECURITIES"
+	securityFirmFutuSG         = "FUTUSG"
+	securityFirmFutuInc        = "FUTUINC"
+	securityFirmFutuCA         = "FUTUCA"
+	securityFirmFutuMY         = "FUTUMY"
+	securityFirmFutuAU         = "FUTUAU"
 )
 
 const (
@@ -54,12 +54,12 @@ const (
 )
 
 var securityFirmNames = map[string]string{
-	securityFirmMoomooHK: "moomoo Securities (Hong Kong)",
-	securityFirmMoomooSG: "moomoo (Singapore)",
-	securityFirmMoomooUS: "moomoo (United States)",
-	securityFirmMoomooCA: "moomoo (Canada)",
-	securityFirmMoomooMY: "moomoo (Malaysia)",
-	securityFirmMoomooAU: "moomoo (Australia)",
+	securityFirmFutuSecurities: "moomoo Securities (Hong Kong)",
+	securityFirmFutuSG:         "moomoo (Singapore)",
+	securityFirmFutuInc:        "moomoo (United States)",
+	securityFirmFutuCA:         "moomoo (Canada)",
+	securityFirmFutuMY:         "moomoo (Malaysia)",
+	securityFirmFutuAU:         "moomoo (Australia)",
 }
 
 var tradingMarketNames = map[int]string{

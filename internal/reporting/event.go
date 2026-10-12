@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DefaultHost = "report.moomoo.com"
+	DefaultHost = "ai-report.moomoo.com"
 
 	DefaultQueueSize    = 256
 	DefaultRequestLimit = 2 * time.Second
@@ -37,6 +37,7 @@ type Event struct {
 	AgentName       string `json:"agent_name,omitempty"`
 	Platform        string `json:"platform,omitempty"`
 	Command         string `json:"command,omitempty"`
+	Outcome         string `json:"outcome,omitempty"`
 	Method          string `json:"method,omitempty"`
 	APIPath         string `json:"api_path,omitempty"`
 	APIPathTemplate string `json:"api_path_template,omitempty"`

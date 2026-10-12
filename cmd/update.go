@@ -12,7 +12,7 @@ import (
 const (
 	msgNoUpdate       = "You are already on the latest version (%s)."
 	msgUpdateAvail    = "Update available: %s -> %s"
-	msgUpdateApplied  = "Successfully updated to version %s."
+	msgUpdateApplied  = "Successfully updated: %s -> %s."
 	msgUpdateCheckRun = "Run 'moomoo update' to apply."
 )
 
@@ -52,7 +52,7 @@ func runUpdate() error {
 	}
 
 	if !info.Available && !updateForce {
-		fmt.Printf(msgNoUpdate+"\n", Version)
+		fmt.Printf(msgNoUpdate+"\n", info.CurrentVersion)
 		return nil
 	}
 	if updateForce {
@@ -91,6 +91,6 @@ func applyUpdate(info *update.UpdateInfo) error {
 	if err := update.Apply(info); err != nil {
 		return fmt.Errorf("apply update: %w", err)
 	}
-	fmt.Printf(msgUpdateApplied+"\n", info.LatestVersion)
+	fmt.Printf(msgUpdateApplied+"\n", info.CurrentVersion, info.LatestVersion)
 	return nil
 }

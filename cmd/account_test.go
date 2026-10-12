@@ -7,7 +7,7 @@ import (
 )
 
 func TestFormatSecurityFirm(t *testing.T) {
-	if got := formatSecurityFirm(securityFirmMoomooUS); got != "moomoo (United States)" {
+	if got := formatSecurityFirm(securityFirmFutuInc); got != "moomoo (United States)" {
 		t.Fatalf("formatSecurityFirm() = %q", got)
 	}
 	if got := formatSecurityFirm("UNKNOWN"); got != "UNKNOWN" {

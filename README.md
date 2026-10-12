@@ -50,6 +50,13 @@ moomoo auth status
 moomoo check
 ```
 
+Query market data:
+
+```bash
+moomoo quote HK.00700 US.AAPL
+moomoo kline US.AAPL --ktype 2 --format json
+```
+
 List authorized trading accounts:
 
 ```bash
@@ -59,12 +66,19 @@ moomoo account list
 ## Common Commands
 
 ```bash
+moomoo quote HK.00700 US.AAPL --format json
+moomoo snapshot HK.00700 US.AAPL --format json
+moomoo broker HK.00700 --view history --days-before 5 --format json
+moomoo capital HK.00700 --view distribution --format json
+moomoo option chain US.AAPL --format json
 moomoo account list --format json
 moomoo account funds --account <account-id> --currency USD
 moomoo position --account <account-id> --format json
 moomoo order list --account <account-id> --market US
 moomoo order history --account <account-id> --market US --symbol US.AAPL
 moomoo deal history --account <account-id> --market US --start <microseconds> --end <microseconds>
+moomoo sim account list --format json
+moomoo sim order buy US.AAPL 2 --market US --type limit --price 180.5 --format json
 moomoo crypto account list --format json
 moomoo crypto balance --account <account-id> --format json
 moomoo crypto order history --account <account-id> --symbol BTCUSD --format json
@@ -111,6 +125,7 @@ Common keys:
 ```text
 api_base
 client_id
+client_id_api_base
 redirect_uri
 default_account
 auto_update
@@ -118,7 +133,7 @@ auto_update
 
 ## Command Reference
 
-This section summarizes the supported authentication, securities trading, and cryptocurrency trading commands. Use `--format json` when consuming command output from scripts.
+This section summarizes the supported authentication, market data, securities trading, and cryptocurrency trading commands. Use `--format json` when consuming command output from scripts.
 
 ### Authentication
 
@@ -130,6 +145,25 @@ This section summarizes the supported authentication, securities trading, and cr
 | `moomoo auth logout` | Remove the stored OAuth token. | The next authenticated command will require login again. |
 | `moomoo auth register` | Register a new OAuth client. | Normal login reuses the existing client; run only when client registration must be refreshed. |
 | `moomoo check` | Verify token validity and API connectivity. | Checks the current API base and token state. |
+
+### Market Data
+
+Quote commands require quote permission. Securities symbols use `MARKET.CODE`, such as `HK.00700` and `US.AAPL`. Hong Kong numeric codes are normalized to five digits, so `HK.700` is sent as `HK.00700`.
+
+| Command | Purpose | Key options |
+| --- | --- | --- |
+| `moomoo quote <symbol...>` | Get real-time quotes for one or more securities. | Add `--format json` for scripts. |
+| `moomoo basicinfo <symbol...>` | Get static symbol information in batch. | Add `--format json` for complete fields. |
+| `moomoo snapshot <symbol...>` | Get market snapshots in batch. | Add `--format json` for complete fields. |
+| `moomoo kline <symbol>` | Get the latest K-line bars. | `--num`, `--ktype`, `--autype`, `--extended-time`, `--format json` |
+| `moomoo history-kline <symbol>` | Get historical K-line bars by date range or cursor. | `--start`, `--end`, `--next-time`, `--num`, `--format json` |
+| `moomoo ticker <symbol>` | Get latest tick-by-tick trades. | `--num`, repeatable `--period`, `--format json` |
+| `moomoo rt-data <symbol>` | Get intraday time-share data. | `--section`, `--format json` |
+| `moomoo order-book <symbol>` | Get real-time order book depth. | `--num`, `--format json`; `depth` is an alias. |
+| `moomoo rank [type]` | Show market rankings. | `volume`, `turnover`, `gainers`, `losers`, `amplitude`; `--market`, `--count` |
+| `moomoo option chain <symbol>` | Query an underlying's option chain. | `--start`, `--end`, `--index-option-type`, `--filter-standard` |
+
+Additional quote REST commands include aggregated views such as `broker`, `capital`, `company`, `corporate-actions`, `financials`, `option-data`, `plate`, `research`, `shareholders`, `short`, `watchlist`, and `valuation`, plus standalone screen/list commands such as `stock-screen`, `warrant-screen`, `option-screen`, `future-info`, `market-state`, and `trading-days`. See `.local_docs/moomoo-cli/docs/quote-cli-guide.md` for the full Quote command guide.
 
 ### Securities Accounts and Positions
 
@@ -155,6 +189,26 @@ This section summarizes the supported authentication, securities trading, and cr
 | `moomoo deal --account <account-id> --market <market>` | List today's trades. | `--page-size`, `--format json` |
 | `moomoo deal history --account <account-id> --market <market>` | List historical trades. | `--symbol`, `--start`, `--end`, `--page-size`, `--format json` |
 
+### Simulated Trading
+
+Simulated trading commands use a dedicated simulated account ID. If `--account` is omitted, the CLI uses the first simulated account returned by the account-list endpoint. Simulated orders do not use root-level `sim-trade-*` commands; use the grouped `sim` commands below.
+
+| Command | Purpose | Key options |
+| --- | --- | --- |
+| `moomoo sim account list` | List simulated trading accounts. | Add `--format json` for scripts. |
+| `moomoo sim account funds` | Show simulated account funds and buying power. | `--account`, `--format json` |
+| `moomoo sim position` | List simulated positions. | `--account`, `--market`, `--format json` |
+| `moomoo sim order buy <symbol> <qty>` | Submit a simulated buy order. | `--account`, `--market`, `--type`, `--price`, `--session`, `--text` |
+| `moomoo sim order sell <symbol> <qty>` | Submit a simulated sell order. | Same core order options as `sim order buy`. |
+| `moomoo sim order place <qty>` | Submit a generic simulated order. | `--symbol`, `--side`, `--account`, `--market`, `--type`, `--price` |
+| `moomoo sim order modify <order-id>` | Modify a simulated order. | `--account`, `--market`, `--qty`, `--price` |
+| `moomoo sim order cancel <order-id>` | Cancel a simulated order. | `--account`, `--market`, `--format json` |
+| `moomoo sim order list` | List open simulated orders. | `--account`, `--market`, `--format json` |
+| `moomoo sim order history` | List historical simulated orders. | `--account`, `--market`, `--start`, `--end`, `--page-size`, `--next-key` |
+| `moomoo sim order max-qty <symbol>` | Query simulated maximum tradable quantity. | `--account`, `--market`, `--type`, `--price`, `--order-id` |
+
+See `.local_docs/moomoo-cli/docs/sim-trading-cli-guide.md` for the full simulated trading command guide.
+
 ### Cryptocurrency Trading
 
 | Command | Purpose | Key options |
@@ -177,7 +231,7 @@ This section summarizes the supported authentication, securities trading, and cr
 
 Most trading commands accept `--account` and fall back to `default_account` when configured. Commands that list historical orders or fills accept microsecond timestamp filters.
 
-Securities commands use markets such as `HK`, `US`, `HKCC`, `SG`, `JP`, `AU`, `MY`, and `KR`. Cryptocurrency commands use trading pairs such as `BTCUSD` and `ETHHKD`.
+Securities symbol arguments and `--symbol` filters use `MARKET.CODE`, such as `HK.00700` and `US.AAPL`. Hong Kong numeric codes are normalized to five digits, so `HK.700` is sent as `HK.00700`. Cryptocurrency commands use trading pairs such as `BTCUSD` and `ETHHKD`.
 
 Order placement, modification, and cancellation operate on real accounts. The CLI prints an order summary and requires local confirmation before submitting supported trading operations.
 

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/user"
+	"strings"
 	"time"
 )
 
@@ -62,7 +63,7 @@ type TokenResponse struct {
 	Scope               string      `json:"scope"`
 	Account             AccountInfo `json:"account"`
 	QuotePermissions    []string    `json:"quote_permissions"`
-	UserID              string      `json:"futu_id"`
+	FutuID              string      `json:"futu_id"`
 	MemberID            string      `json:"member_id"`
 	AccountNo           string      `json:"account_no"`
 	AccountType         string      `json:"account_type"`
@@ -79,7 +80,7 @@ type OAuthError struct {
 }
 
 func (e *OAuthError) Error() string {
-	return fmt.Sprintf("oauth error: %s - %s", e.Code, e.Description)
+	return fmt.Sprintf("oauth error: %s — %s", e.Code, e.Description)
 }
 
 // oauthErrorResponse represents an error returned by the OAuth token endpoint.
@@ -99,13 +100,18 @@ type registrationRequest struct {
 // RegisterClient performs dynamic client registration (RFC 7591) with the
 // moomoo OAuth server, returning a client_id for subsequent authorization requests.
 func RegisterClient(clientName string, redirectURIs []string) (*RegistrationResponse, error) {
+	return RegisterClientWithBase(oauthBaseURL, clientName, redirectURIs)
+}
+
+// RegisterClientWithBase performs dynamic client registration against baseURL.
+func RegisterClientWithBase(baseURL, clientName string, redirectURIs []string) (*RegistrationResponse, error) {
 	payload := registrationRequest{
 		ClientName:              clientName,
 		RedirectURIs:            redirectURIs,
 		TokenEndpointAuthMethod: tokenAuthMethodNone,
 		Scope:                   defaultScopes,
 	}
-	body, err := postJSON(oauthBaseURL+registerURL, payload)
+	body, err := postJSON(endpointURL(baseURL, registerURL), payload)
 	if err != nil {
 		return nil, fmt.Errorf("client registration: %w", err)
 	}
@@ -114,6 +120,11 @@ func RegisterClient(clientName string, redirectURIs []string) (*RegistrationResp
 
 // BuildAuthorizationURL constructs the browser URL for user authorization.
 func BuildAuthorizationURL(clientID, redirectURI string, pkce *PKCEParams, state string) string {
+	return BuildAuthorizationURLWithBase(oauthBaseURL, clientID, redirectURI, pkce, state)
+}
+
+// BuildAuthorizationURLWithBase constructs the browser URL for baseURL.
+func BuildAuthorizationURLWithBase(baseURL, clientID, redirectURI string, pkce *PKCEParams, state string) string {
 	params := url.Values{
 		"client_id":             {clientID},
 		"code_challenge":        {pkce.CodeChallenge},
@@ -123,11 +134,16 @@ func BuildAuthorizationURL(clientID, redirectURI string, pkce *PKCEParams, state
 		"scope":                 {defaultScopes},
 		"state":                 {state},
 	}
-	return oauthBaseURL + authorizeURL + "?" + params.Encode()
+	return endpointURL(baseURL, authorizeURL) + "?" + params.Encode()
 }
 
 // ExchangeCode exchanges an authorization code for tokens using PKCE.
 func ExchangeCode(clientID, code, redirectURI, codeVerifier string) (*TokenResponse, error) {
+	return ExchangeCodeWithBase(oauthBaseURL, clientID, code, redirectURI, codeVerifier)
+}
+
+// ExchangeCodeWithBase exchanges an authorization code against baseURL.
+func ExchangeCodeWithBase(baseURL, clientID, code, redirectURI, codeVerifier string) (*TokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {grantTypeAuthCode},
 		"client_id":     {clientID},
@@ -135,7 +151,7 @@ func ExchangeCode(clientID, code, redirectURI, codeVerifier string) (*TokenRespo
 		"redirect_uri":  {redirectURI},
 		"code_verifier": {codeVerifier},
 	}
-	body, err := postForm(oauthBaseURL+tokenURL, data)
+	body, err := postForm(endpointURL(baseURL, tokenURL), data)
 	if err != nil {
 		return nil, fmt.Errorf("token exchange: %w", err)
 	}
@@ -144,16 +160,29 @@ func ExchangeCode(clientID, code, redirectURI, codeVerifier string) (*TokenRespo
 
 // RefreshAccessToken uses a refresh token to obtain a new access token.
 func RefreshAccessToken(clientID, refreshToken string) (*TokenResponse, error) {
+	return RefreshAccessTokenWithBase(oauthBaseURL, clientID, refreshToken)
+}
+
+// RefreshAccessTokenWithBase refreshes an access token against baseURL.
+func RefreshAccessTokenWithBase(baseURL, clientID, refreshToken string) (*TokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {grantTypeRefresh},
 		"client_id":     {clientID},
 		"refresh_token": {refreshToken},
 	}
-	body, err := postForm(oauthBaseURL+tokenURL, data)
+	body, err := postForm(endpointURL(baseURL, tokenURL), data)
 	if err != nil {
 		return nil, fmt.Errorf("refresh token: %w", err)
 	}
 	return parseTokenResponseOrError(body)
+}
+
+func endpointURL(baseURL, path string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if len(baseURL) == 0 {
+		baseURL = oauthBaseURL
+	}
+	return baseURL + path
 }
 
 // GenerateState produces a cryptographically random hex string for CSRF protection.

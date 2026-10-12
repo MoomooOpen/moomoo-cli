@@ -17,7 +17,6 @@ const (
 )
 
 type Reporter struct {
-	enabled  bool
 	endpoint string
 	token    string
 	client   *http.Client
@@ -29,7 +28,6 @@ type Reporter struct {
 }
 
 type Options struct {
-	Enabled        bool
 	Host           string
 	Endpoint       string
 	Token          string
@@ -59,10 +57,8 @@ func NewReporter(opts Options) *Reporter {
 	if endpoint == "" {
 		endpoint = ReportURL(opts.Host)
 	}
-	enabled := opts.Enabled && endpoint != ""
 
 	r := &Reporter{
-		enabled:  enabled,
 		endpoint: endpoint,
 		token:    opts.Token,
 		client:   httpClient,
@@ -70,15 +66,13 @@ func NewReporter(opts Options) *Reporter {
 		flush:    make(chan chan struct{}),
 		done:     make(chan struct{}),
 	}
-	if r.enabled {
-		r.wg.Add(1)
-		go r.run()
-	}
+	r.wg.Add(1)
+	go r.run()
 	return r
 }
 
 func (r *Reporter) Report(event Event) {
-	if r == nil || !r.enabled {
+	if r == nil {
 		return
 	}
 	select {
@@ -88,7 +82,7 @@ func (r *Reporter) Report(event Event) {
 }
 
 func (r *Reporter) Flush(ctx context.Context) error {
-	if r == nil || !r.enabled {
+	if r == nil {
 		return nil
 	}
 	ack := make(chan struct{})
@@ -106,7 +100,7 @@ func (r *Reporter) Flush(ctx context.Context) error {
 }
 
 func (r *Reporter) Close(ctx context.Context) error {
-	if r == nil || !r.enabled {
+	if r == nil {
 		return nil
 	}
 	_ = r.Flush(ctx)

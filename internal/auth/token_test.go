@@ -36,7 +36,7 @@ func TestDeleteTokenRemovesFileAndIsIdempotent(t *testing.T) {
 	}
 }
 
-// TokenStore.IsExpired.
+// ── TokenStore.IsExpired ────────────────────────────────────────────────────
 
 func TestTokenStore_IsExpired_FreshToken(t *testing.T) {
 	store := &TokenStore{
@@ -76,7 +76,7 @@ func TestTokenStore_IsExpired_ExactlyAtBuffer(t *testing.T) {
 	}
 }
 
-// unmarshalToken.
+// ── unmarshalToken ──────────────────────────────────────────────────────────
 
 func TestUnmarshalToken_Valid(t *testing.T) {
 	data := []byte(`{
@@ -107,7 +107,7 @@ func TestUnmarshalToken_InvalidJSON(t *testing.T) {
 	}
 }
 
-// buildUpdatedStore.
+// ── buildUpdatedStore ───────────────────────────────────────────────────────
 
 func TestBuildUpdatedStore(t *testing.T) {
 	resp := &TokenResponse{
@@ -198,7 +198,44 @@ func TestEnsureValidStoreRefreshesExpiredToken(t *testing.T) {
 	}
 }
 
-// removeFileIfExists.
+func TestEnsureValidStoreWithBaseRefreshesAtConfiguredBase(t *testing.T) {
+	const customBaseURL = "https://sandbox.moomoo.com"
+	previousClient := oauthHTTPClient
+	oauthHTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.String() != customBaseURL+tokenURL {
+			t.Fatalf("refresh URL = %q, want %q", req.URL.String(), customBaseURL+tokenURL)
+		}
+		body := `{"access_token":"new-access","expires_in":3600,"token_type":"bearer"}`
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
+	})}
+	t.Cleanup(func() { oauthHTTPClient = previousClient })
+
+	path := filepath.Join(t.TempDir(), "token.json")
+	store := &TokenStore{
+		AccessToken:  "old-access",
+		RefreshToken: "old-refresh",
+		ExpiresAt:    time.Now().Add(-time.Minute),
+		ClientID:     "stored-client-id",
+		ClientName:   "test-client",
+	}
+	if err := store.Save(path); err != nil {
+		t.Fatalf("save token: %v", err)
+	}
+
+	refreshed, err := EnsureValidStoreWithBase(customBaseURL, "", path)
+	if err != nil {
+		t.Fatalf("EnsureValidStoreWithBase() error = %v", err)
+	}
+	if refreshed.AccessToken != "new-access" {
+		t.Fatalf("AccessToken = %q, want new-access", refreshed.AccessToken)
+	}
+}
+
+// ── removeFileIfExists ──────────────────────────────────────────────────────
 
 func TestRemoveFileIfExists_NonExistentFile(t *testing.T) {
 	err := removeFileIfExists("/tmp/moomoo-test-nonexistent-file-12345")

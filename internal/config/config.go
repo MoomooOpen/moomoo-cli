@@ -6,14 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // Default configuration values.
 const (
 	DefaultAPIBase    = "https://webapi.moomoo.com"
-	DefaultTelemetry  = true
 	DefaultAutoUpdate = true
-	DefaultReportHost = "report.moomoo.com"
 
 	configDirName  = ".moomoo"
 	configFileName = "config.json"
@@ -27,24 +26,22 @@ const (
 const (
 	KeyAPIBase     = "api_base"
 	KeyClientID    = "client_id"
+	KeyClientIDAPI = "client_id_api_base"
 	KeyRedirectURI = "redirect_uri"
 	KeyTokenFile   = "token_file"
 	KeyDefaultAcct = "default_account"
-	KeyTelemetry   = "telemetry"
 	KeyAutoUpdate  = "auto_update"
-	KeyReportHost  = "report_host"
 )
 
 // Config holds the CLI configuration.
 type Config struct {
-	APIBase     string `json:"api_base"`
-	ClientID    string `json:"client_id,omitempty"`
-	RedirectURI string `json:"redirect_uri,omitempty"`
-	TokenFile   string `json:"token_file"`
-	DefaultAcct string `json:"default_account"`
-	Telemetry   bool   `json:"telemetry"`
-	AutoUpdate  bool   `json:"auto_update"`
-	ReportHost  string `json:"report_host"`
+	APIBase         string `json:"api_base"`
+	ClientID        string `json:"client_id,omitempty"`
+	ClientIDAPIBase string `json:"client_id_api_base,omitempty"`
+	RedirectURI     string `json:"redirect_uri,omitempty"`
+	TokenFile       string `json:"token_file"`
+	DefaultAcct     string `json:"default_account"`
+	AutoUpdate      bool   `json:"auto_update"`
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
@@ -52,9 +49,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		APIBase:    DefaultAPIBase,
 		TokenFile:  filepath.Join(ConfigDir(), tokenFileName),
-		Telemetry:  DefaultTelemetry,
 		AutoUpdate: DefaultAutoUpdate,
-		ReportHost: DefaultReportHost,
 	}
 }
 
@@ -106,11 +101,30 @@ func parseConfig(data []byte) (*Config, error) {
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
+	cfg.Normalize()
 	return cfg, nil
+}
+
+// NormalizeAPIBase canonicalizes API base URLs before persistence/comparison.
+func NormalizeAPIBase(value string) string {
+	value = strings.TrimRight(strings.TrimSpace(value), "/")
+	if len(value) == 0 {
+		return DefaultAPIBase
+	}
+	return value
+}
+
+// Normalize fills default values and canonicalizes comparable fields.
+func (c *Config) Normalize() {
+	c.APIBase = NormalizeAPIBase(c.APIBase)
+	if len(c.ClientIDAPIBase) > 0 {
+		c.ClientIDAPIBase = NormalizeAPIBase(c.ClientIDAPIBase)
+	}
 }
 
 // Save writes the current configuration to ~/.moomoo/config.json.
 func (c *Config) Save() error {
+	c.Normalize()
 	path := configFilePath()
 	if err := ensureDir(filepath.Dir(path)); err != nil {
 		return err
@@ -142,21 +156,19 @@ func writeConfig(path string, cfg *Config) error {
 func (c *Config) Get(key string) string {
 	switch key {
 	case KeyAPIBase:
-		return c.APIBase
+		return NormalizeAPIBase(c.APIBase)
 	case KeyClientID:
 		return c.ClientID
+	case KeyClientIDAPI:
+		return c.ClientIDAPIBase
 	case KeyRedirectURI:
 		return c.RedirectURI
 	case KeyTokenFile:
 		return c.TokenFile
 	case KeyDefaultAcct:
 		return c.DefaultAcct
-	case KeyTelemetry:
-		return strconv.FormatBool(c.Telemetry)
 	case KeyAutoUpdate:
 		return strconv.FormatBool(c.AutoUpdate)
-	case KeyReportHost:
-		return c.ReportHost
 	default:
 		return ""
 	}
@@ -166,9 +178,11 @@ func (c *Config) Get(key string) string {
 func (c *Config) Set(key, value string) error {
 	switch key {
 	case KeyAPIBase:
-		c.APIBase = value
+		c.APIBase = NormalizeAPIBase(value)
 	case KeyClientID:
 		c.ClientID = value
+	case KeyClientIDAPI:
+		c.ClientIDAPIBase = NormalizeAPIBase(value)
 	case KeyRedirectURI:
 		c.RedirectURI = value
 	case KeyTokenFile:
@@ -178,12 +192,8 @@ func (c *Config) Set(key, value string) error {
 		c.TokenFile = value
 	case KeyDefaultAcct:
 		c.DefaultAcct = value
-	case KeyTelemetry:
-		return c.setBool(&c.Telemetry, key, value)
 	case KeyAutoUpdate:
 		return c.setBool(&c.AutoUpdate, key, value)
-	case KeyReportHost:
-		c.ReportHost = value
 	default:
 		return fmt.Errorf("unknown config key: %s", key)
 	}

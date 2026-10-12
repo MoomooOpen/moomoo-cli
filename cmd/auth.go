@@ -53,6 +53,8 @@ var (
 	noBrowserFlag  bool
 )
 
+var registerOAuthClient = auth.RegisterClientWithBase
+
 var authCmd = &cobra.Command{Use: "auth", Short: "Manage OAuth2 authentication"}
 var loginCmd = &cobra.Command{Use: "login", Short: "Log in with OAuth2", RunE: runLogin}
 var logoutCmd = &cobra.Command{
@@ -89,6 +91,10 @@ func useExistingToken(path string) bool {
 	if err != nil {
 		return false
 	}
+	if !clientIDMatchesCurrentAPIBase() {
+		fmt.Fprintln(os.Stderr, "Stored OAuth client is not bound to the current API base; starting authorization again.")
+		return false
+	}
 	if !store.IsExpired() {
 		syncStoredAccount(path, store)
 		fmt.Fprintln(os.Stderr, messageUsingToken)
@@ -98,7 +104,7 @@ func useExistingToken(path string) bool {
 	if len(clientID) == 0 {
 		clientID = store.ClientID
 	}
-	if _, err := auth.EnsureValid(clientID, path); err != nil {
+	if _, err := auth.EnsureValidWithBase(currentAPIBase(), clientID, path); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to refresh the existing token; starting authorization again: %v\n", err)
 		return false
 	}
@@ -160,7 +166,7 @@ func newAuthorizationRequest(clientID, redirectURI string) (*authorizationReques
 	}
 	return &authorizationRequest{
 		ClientID: clientID, RedirectURI: redirectURI, State: state, PKCE: pkce,
-		URL: auth.BuildAuthorizationURL(clientID, redirectURI, pkce, state),
+		URL: auth.BuildAuthorizationURLWithBase(currentAPIBase(), clientID, redirectURI, pkce, state),
 	}, nil
 }
 
@@ -243,8 +249,8 @@ func exchangeAndSave(result *auth.CallbackResult, request *authorizationRequest,
 	if result.State != request.State {
 		return fmt.Errorf("state validation failed; a CSRF attack may have occurred")
 	}
-	response, err := auth.ExchangeCode(
-		request.ClientID, result.Code, request.RedirectURI, request.PKCE.CodeVerifier,
+	response, err := auth.ExchangeCodeWithBase(
+		currentAPIBase(), request.ClientID, result.Code, request.RedirectURI, request.PKCE.CodeVerifier,
 	)
 	if err != nil {
 		return fmt.Errorf("exchange code: %w", err)
@@ -253,14 +259,15 @@ func exchangeAndSave(result *auth.CallbackResult, request *authorizationRequest,
 }
 
 func ensureClientID(redirectURIs []string) (string, error) {
-	if len(cfg.ClientID) > 0 && cfg.RedirectURI == redirectURIs[0] {
+	if len(cfg.ClientID) > 0 && cfg.RedirectURI == redirectURIs[0] && clientIDMatchesCurrentAPIBase() {
 		return cfg.ClientID, nil
 	}
 	return registerAndSaveClientID(redirectURIs)
 }
 
 func registerAndSaveClientID(redirectURIs []string) (string, error) {
-	response, err := auth.RegisterClient(auth.BuildClientName(clientNameFlag), redirectURIs)
+	apiBase := currentAPIBase()
+	response, err := registerOAuthClient(apiBase, auth.BuildClientName(clientNameFlag), redirectURIs)
 	if err != nil {
 		return "", fmt.Errorf("client registration: %w", err)
 	}
@@ -270,10 +277,27 @@ func registerAndSaveClientID(redirectURIs []string) (string, error) {
 	if err := cfg.Set(config.KeyRedirectURI, redirectURIs[0]); err != nil {
 		return "", fmt.Errorf("set redirect_uri: %w", err)
 	}
+	if err := cfg.Set(config.KeyClientIDAPI, apiBase); err != nil {
+		return "", fmt.Errorf("set client_id_api_base: %w", err)
+	}
 	if err := cfg.Save(); err != nil {
 		return "", fmt.Errorf("save config: %w", err)
 	}
 	return response.ClientID, nil
+}
+
+func clientIDMatchesCurrentAPIBase() bool {
+	if cfg == nil || len(cfg.ClientIDAPIBase) == 0 {
+		return false
+	}
+	return config.NormalizeAPIBase(cfg.ClientIDAPIBase) == currentAPIBase()
+}
+
+func currentAPIBase() string {
+	if cfg == nil {
+		return config.DefaultAPIBase
+	}
+	return config.NormalizeAPIBase(cfg.APIBase)
 }
 
 func runRegister(_ *cobra.Command, _ []string) error {
@@ -307,7 +331,7 @@ func syncStoredAccount(path string, store *auth.TokenStore) {
 		return
 	}
 	httpClient := client.New(
-		cfg.APIBase,
+		currentAPIBase(),
 		client.WithToken(store.AccessToken),
 		client.WithClientName(auth.BuildClientName(clientNameFlag)),
 		client.WithVersion(Version),
@@ -343,8 +367,8 @@ func selectStatusAccount(accounts []service.Account) *service.Account {
 }
 
 func mergeStatusAccount(target *auth.AccountInfo, source *service.Account) {
-	if len(target.UserID) == 0 {
-		target.UserID = source.UserID
+	if len(target.FutuID) == 0 {
+		target.FutuID = source.FutuID
 	}
 	if len(target.AccountNo) == 0 {
 		target.AccountNo = source.AccountNo
@@ -413,7 +437,10 @@ func refreshTokenIfExpired(path string, store *auth.TokenStore) (*auth.TokenStor
 	if !store.IsExpired() {
 		return store, nil
 	}
-	return auth.RefreshStoredToken(statusRefreshClientID(store), path, store)
+	if !clientIDMatchesCurrentAPIBase() {
+		return store, nil
+	}
+	return auth.RefreshStoredTokenWithBase(currentAPIBase(), statusRefreshClientID(store), path, store)
 }
 
 func statusRefreshClientID(store *auth.TokenStore) string {
@@ -478,7 +505,7 @@ func newAuthStatus(store *auth.TokenStore, _ string) authStatusData {
 }
 
 func sanitizeStatusAccount(account auth.AccountInfo) auth.AccountInfo {
-	account.UserID = ""
+	account.FutuID = ""
 	account.MemberID = ""
 	account.AccountNo = ""
 	return account

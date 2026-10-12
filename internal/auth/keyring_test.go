@@ -9,7 +9,7 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-// AES-GCM encrypt/decrypt round-trip.
+// ── AES-GCM encrypt/decrypt round-trip ──────────────────────────────────────
 
 func TestAESGCM_RoundTrip(t *testing.T) {
 	key := deriveMachineKey()
@@ -94,7 +94,7 @@ func TestAESGCM_EmptyPlaintext(t *testing.T) {
 	}
 }
 
-// EncryptAndSave / DecryptAndLoad round-trip.
+// ── EncryptAndSave / DecryptAndLoad round-trip ──────────────────────────────
 
 func TestEncryptAndSave_DecryptAndLoad_RoundTrip(t *testing.T) {
 	keyring.MockInit()
@@ -182,7 +182,7 @@ func TestDecryptAndLoad_FileNotFound(t *testing.T) {
 	}
 }
 
-// deriveMachineKey.
+// ── deriveMachineKey ────────────────────────────────────────────────────────
 
 func TestDeriveMachineKey_Deterministic(t *testing.T) {
 	k1 := deriveMachineKey()
@@ -195,7 +195,7 @@ func TestDeriveMachineKey_Deterministic(t *testing.T) {
 	}
 }
 
-// generateNonce.
+// ── generateNonce ───────────────────────────────────────────────────────────
 
 func TestGenerateNonce_CorrectSize(t *testing.T) {
 	nonce, err := generateNonce(12)
@@ -215,7 +215,7 @@ func TestGenerateNonce_Unique(t *testing.T) {
 	}
 }
 
-// ensureParentDir.
+// ── ensureParentDir ─────────────────────────────────────────────────────────
 
 func TestEnsureParentDir_CreatesNestedDir(t *testing.T) {
 	dir := t.TempDir()

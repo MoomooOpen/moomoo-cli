@@ -15,7 +15,7 @@ func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
 }
 
-// TokenResponse parsing.
+// ── TokenResponse parsing ───────────────────────────────────────────────────
 
 func TestParseTokenResponse_Valid(t *testing.T) {
 	body := `{
@@ -50,7 +50,7 @@ func TestParseTokenResponse_InvalidJSON(t *testing.T) {
 	}
 }
 
-// parseTokenResponseOrError.
+// ── parseTokenResponseOrError ───────────────────────────────────────────────
 
 func TestParseTokenResponseOrError_Success(t *testing.T) {
 	body := `{"access_token":"tok","refresh_token":"ref","expires_in":100,"token_type":"bearer"}`
@@ -81,18 +81,18 @@ func TestParseTokenResponseOrError_OAuthError(t *testing.T) {
 	}
 }
 
-// OAuthError.Error().
+// ── OAuthError.Error() ─────────────────────────────────────────────────────
 
 func TestOAuthError_Error(t *testing.T) {
 	e := &OAuthError{Code: "test_code", Description: "test desc"}
 	got := e.Error()
-	want := "oauth error: test_code - test desc"
+	want := "oauth error: test_code — test desc"
 	if got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
 }
 
-// BuildAuthorizationURL.
+// ── BuildAuthorizationURL ───────────────────────────────────────────────────
 
 func TestBuildAuthorizationURL(t *testing.T) {
 	pkce := &PKCEParams{
@@ -130,6 +130,26 @@ func TestBuildAuthorizationURL(t *testing.T) {
 	}
 }
 
+func TestBuildAuthorizationURLWithBase(t *testing.T) {
+	pkce := &PKCEParams{
+		CodeChallenge: "challenge123",
+		Method:        "S256",
+	}
+	authURL := BuildAuthorizationURLWithBase(
+		"https://sandbox.moomoo.com/", "cid-001", "http://127.0.0.1:18888/callback", pkce, "state-abc",
+	)
+	parsed, err := url.Parse(authURL)
+	if err != nil {
+		t.Fatalf("parse URL: %v", err)
+	}
+	if parsed.Scheme != "https" || parsed.Host != "sandbox.moomoo.com" {
+		t.Fatalf("OAuth origin = %q, want https://sandbox.moomoo.com", parsed.Scheme+"://"+parsed.Host)
+	}
+	if !strings.HasSuffix(parsed.Path, authorizeURL) {
+		t.Fatalf("path = %q, want suffix %q", parsed.Path, authorizeURL)
+	}
+}
+
 func TestOAuthHTTPClientHasTimeout(t *testing.T) {
 	if oauthHTTPClient.Timeout != oauthHTTPTimeout {
 		t.Fatalf("OAuth HTTP timeout = %s, want %s", oauthHTTPClient.Timeout, oauthHTTPTimeout)
@@ -139,7 +159,7 @@ func TestOAuthHTTPClientHasTimeout(t *testing.T) {
 	}
 }
 
-// GenerateState.
+// ── GenerateState ───────────────────────────────────────────────────────────
 
 func TestGenerateState_Length(t *testing.T) {
 	state, err := GenerateState()
@@ -160,7 +180,7 @@ func TestGenerateState_Unique(t *testing.T) {
 	}
 }
 
-// BuildClientName.
+// ── BuildClientName ─────────────────────────────────────────────────────────
 
 func TestBuildClientName_WithOverride(t *testing.T) {
 	name := BuildClientName("MyApp")
@@ -180,7 +200,7 @@ func TestBuildClientName_Default(t *testing.T) {
 	}
 }
 
-// HTTP-level integration tests with httptest.
+// ── HTTP-level integration tests with httptest ──────────────────────────────
 
 func TestPostJSON_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -222,6 +242,39 @@ func TestPostJSON_HTTPError(t *testing.T) {
 	}
 }
 
+func TestRegisterClientWithBaseUsesBaseURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != registerURL {
+			t.Fatalf("path = %q, want %q", r.URL.Path, registerURL)
+		}
+		var req registrationRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode registration request: %v", err)
+		}
+		if req.ClientName != "test-client" {
+			t.Fatalf("ClientName = %q, want test-client", req.ClientName)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"client_id":                  "cid-001",
+			"client_id_issued_at":        1700000000,
+			"client_name":                "test-client",
+			"redirect_uris":              []string{"http://127.0.0.1:18888/callback"},
+			"token_endpoint_auth_method": tokenAuthMethodNone,
+		})
+	}))
+	defer srv.Close()
+
+	resp, err := RegisterClientWithBase(
+		srv.URL+"/", "test-client", []string{"http://127.0.0.1:18888/callback"},
+	)
+	if err != nil {
+		t.Fatalf("RegisterClientWithBase() error = %v", err)
+	}
+	if resp.ClientID != "cid-001" {
+		t.Fatalf("ClientID = %q, want cid-001", resp.ClientID)
+	}
+}
+
 func TestPostJSON_ServerDown(t *testing.T) {
 	_, err := postJSON("http://127.0.0.1:1/unreachable", map[string]string{})
 	if err == nil {
@@ -229,7 +282,7 @@ func TestPostJSON_ServerDown(t *testing.T) {
 	}
 }
 
-// postForm.
+// ── postForm ────────────────────────────────────────────────────────────────
 
 func TestPostForm_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +331,7 @@ func TestPostForm_HTTPError(t *testing.T) {
 	}
 }
 
-// readResponseBody.
+// ── readResponseBody ────────────────────────────────────────────────────────
 
 func TestReadResponseBody_OK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -321,7 +374,7 @@ func TestReadResponseBody_HTTPError(t *testing.T) {
 	}
 }
 
-// parseRegistrationResponse.
+// ── parseRegistrationResponse ───────────────────────────────────────────────
 
 func TestParseRegistrationResponse_Valid(t *testing.T) {
 	body := `{
