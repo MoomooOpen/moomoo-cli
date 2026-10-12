@@ -16,7 +16,7 @@ const (
 
 	DefaultQueueSize    = 256
 	DefaultRequestLimit = 2 * time.Second
-	DefaultFlushTimeout = 500 * time.Millisecond
+	DefaultFlushTimeout = 3 * time.Second
 
 	reportPath     = "/agent_report/call"
 	defaultOrderID = ""

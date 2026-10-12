@@ -92,7 +92,6 @@ func useExistingToken(path string) bool {
 		return false
 	}
 	if !clientIDMatchesCurrentAPIBase() {
-		fmt.Fprintln(os.Stderr, "Stored OAuth client is not bound to the current API base; starting authorization again.")
 		return false
 	}
 	if !store.IsExpired() {

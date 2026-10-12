@@ -80,7 +80,16 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
-	return parseConfig(data)
+	cfg, migrated, err := parseConfigWithMigration(data)
+	if err != nil {
+		return nil, err
+	}
+	if migrated {
+		if err := writeConfig(path, cfg); err != nil {
+			return nil, err
+		}
+	}
+	return cfg, nil
 }
 
 // createDefault writes a default config file and returns the default config.
@@ -97,12 +106,26 @@ func createDefault(path string) (*Config, error) {
 
 // parseConfig unmarshals JSON data into a Config struct.
 func parseConfig(data []byte) (*Config, error) {
+	cfg, _, err := parseConfigWithMigration(data)
+	return cfg, err
+}
+
+func parseConfigWithMigration(data []byte) (*Config, bool, error) {
 	cfg := DefaultConfig()
 	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("parsing config file: %w", err)
+		return nil, false, fmt.Errorf("parsing config file: %w", err)
 	}
+	migrated := cfg.applyUpgradeMigrations()
 	cfg.Normalize()
-	return cfg, nil
+	return cfg, migrated, nil
+}
+
+func (c *Config) applyUpgradeMigrations() bool {
+	if NormalizeAPIBase(c.APIBase) == DefaultAPIBase {
+		return false
+	}
+	c.APIBase = DefaultAPIBase
+	return true
 }
 
 // NormalizeAPIBase canonicalizes API base URLs before persistence/comparison.

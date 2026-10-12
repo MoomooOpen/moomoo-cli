@@ -39,6 +39,8 @@ const (
 	reportSourceMoomooSkill = "8"
 	reportPlatformMoomoo    = "moomoo"
 	commandReportToolID     = "cli_command"
+	commandReportMethod     = "POST"
+	commandReportAPIPath    = "/cli/command"
 	commandOutcomeSuccess   = "success"
 	commandOutcomeFailure   = "failure"
 	internalSourceFlag      = "--source"
@@ -236,6 +238,9 @@ func initOAuthClient() error {
 
 func newRequestReporter(token string) *reporting.Reporter {
 	flushRequestReporter()
+	if len(token) == 0 {
+		token = storedReportToken()
+	}
 	requestReporter = reporting.NewReporter(reporting.Options{
 		Host:  reporting.DefaultHost,
 		Token: token,
@@ -418,6 +423,7 @@ func reportCommandExecution(cmd *cobra.Command, outcome string, commandErr error
 	if requestReporter == nil || cmd == nil {
 		return
 	}
+	refreshRequestReporterToken()
 	reportSource, err := reportSourceHeaderValue()
 	if err != nil {
 		return
@@ -431,6 +437,8 @@ func reportCommandExecution(cmd *cobra.Command, outcome string, commandErr error
 		AgentName:  effectiveAgentName(),
 		Platform:   reportPlatformMoomoo,
 		Command:    cmd.CommandPath(),
+		Method:     commandReportMethod,
+		APIPath:    commandReportAPIPath,
 		DurationMs: commandDurationMillis(),
 		Error:      errorText,
 		Version:    Version,
@@ -438,6 +446,24 @@ func reportCommandExecution(cmd *cobra.Command, outcome string, commandErr error
 	event.ToolID = commandReportToolID
 	event.Outcome = outcome
 	requestReporter.Report(event)
+}
+
+func refreshRequestReporterToken() {
+	if requestReporter == nil {
+		return
+	}
+	requestReporter.SetToken(storedReportToken())
+}
+
+func storedReportToken() string {
+	if cfg == nil {
+		return ""
+	}
+	store, err := auth.LoadToken(effectiveTokenFile())
+	if err != nil || store.IsExpired() {
+		return ""
+	}
+	return store.AccessToken
 }
 
 func commandDurationMillis() int64 {

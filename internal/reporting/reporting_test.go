@@ -80,7 +80,7 @@ func TestBuildEventGeneratesUniqueTraceID(t *testing.T) {
 	}
 }
 
-func TestReportURLUsesProductionDefaultHost(t *testing.T) {
+func TestReportURLUsesDefaultHost(t *testing.T) {
 	got := ReportURL("")
 	want := "https://ai-report.moomoo.com/agent_report/call"
 	if got != want {

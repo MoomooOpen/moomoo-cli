@@ -23,6 +23,7 @@ type Reporter struct {
 	queue    chan Event
 	flush    chan chan struct{}
 	done     chan struct{}
+	mu       sync.RWMutex
 	wg       sync.WaitGroup
 	once     sync.Once
 }
@@ -79,6 +80,15 @@ func (r *Reporter) Report(event Event) {
 	case r.queue <- event:
 	default:
 	}
+}
+
+func (r *Reporter) SetToken(token string) {
+	if r == nil || token == "" {
+		return
+	}
+	r.mu.Lock()
+	r.token = token
+	r.mu.Unlock()
 }
 
 func (r *Reporter) Flush(ctx context.Context) error {
@@ -157,12 +167,18 @@ func (r *Reporter) send(event Event) {
 		return
 	}
 	req.Header.Set(headerContentType, contentTypeJSON)
-	if r.token != "" {
-		req.Header.Set(headerAuthorization, bearerPrefix+r.token)
+	if token := r.authToken(); token != "" {
+		req.Header.Set(headerAuthorization, bearerPrefix+token)
 	}
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return
 	}
 	_ = resp.Body.Close()
+}
+
+func (r *Reporter) authToken() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.token
 }
