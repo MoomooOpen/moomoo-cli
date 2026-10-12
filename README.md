@@ -4,6 +4,8 @@ moomoo CLI is a command-line tool for moomoo OpenAPI workflows, including OAuth 
 
 ## Install
 
+The shell installers are the recommended path because they do not require Node.js.
+
 macOS / Linux:
 
 ```bash
@@ -23,16 +25,41 @@ iwr -UseBasicParsing https://raw.githubusercontent.com/MoomooOpen/moomoo-cli/mai
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-npm from GitHub:
+npm:
 
 ```bash
-npm install -g github:MoomooOpen/moomoo-cli
+npm install -g github:MoomooOpen/moomoo-cli --install-links=true
 ```
 
-Direct npm registry installation is not available yet and is still in progress:
+The npm wrapper requires Node.js 18 or newer and npm 9 or newer. `--install-links=true` is recommended for GitHub installs so npm copies the packed package instead of linking to a temporary git checkout.
+
+The scoped npm registry package is not published yet. After it is published, this will also be available:
 
 ```bash
 npm install -g @moomoo/moomoo-cli
+```
+
+If npm reports `spawn sh ENOENT`, configure the lifecycle script shell:
+
+```bash
+npm config set script-shell /bin/sh
+```
+
+If npm reports `uv_cwd` or `getcwd`, run the install from an existing directory:
+
+```bash
+cd ~
+npm install -g github:MoomooOpen/moomoo-cli --install-links=true
+```
+
+If you use nvm, make sure `node` and `npm` come from the same Node installation before installing:
+
+```bash
+which node
+which npm
+node -v
+npm -v
+npm prefix -g
 ```
 
 ## Quick Start
@@ -103,10 +130,10 @@ moomoo update
 If installed from GitHub through npm, reinstall from GitHub:
 
 ```bash
-npm install -g github:MoomooOpen/moomoo-cli
+npm install -g github:MoomooOpen/moomoo-cli --install-links=true
 ```
 
-Direct npm registry updates are not available yet and are still in progress:
+After the package is published to the npm registry, use:
 
 ```bash
 npm update -g @moomoo/moomoo-cli
