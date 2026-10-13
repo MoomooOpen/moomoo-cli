@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,223 +8,36 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/MoomooOpen/moomoo-cli/internal/auth"
 	"github.com/MoomooOpen/moomoo-cli/internal/config"
 	"github.com/MoomooOpen/moomoo-cli/internal/reporting"
 )
 
-const (
-	commandReportAuthHeader          = "Bearer token-1"
-	commandReportCommandUse          = "quote"
-	commandReportStoredToken         = "stored-token-1"
-	commandReportToken               = "token-1"
-	expectedCommandReportCLISource   = int32(6)
-	expectedCommandReportSkillSource = int32(8)
-	expectedCommandReportVersion     = "1.2.3"
-)
-
-func TestReportCommandExecutionDefaultsToCLISource(t *testing.T) {
-	event := runCommandReportTest(t, "", "", expectedCommandReportCLISource, agentNameCLI)
-	assertCommandReportEvent(t, event, expectedCommandReportCLISource, agentNameCLI)
-}
-
-func TestReportCommandExecutionUsesSkillSource(t *testing.T) {
-	event := runCommandReportTest(t, reportSourceModeSkill, agentNameCodex, expectedCommandReportSkillSource, agentNameCodex)
-	assertCommandReportEvent(t, event, expectedCommandReportSkillSource, agentNameCodex)
-}
-
-func TestReportCommandExecutionUsesStoredToken(t *testing.T) {
-	restoreCommandReportGlobals(t)
-	path := saveCommandReportToken(t)
-	cfg = &config.Config{TokenFile: path}
-	tokenFile = ""
-	received := make(chan reporting.Event, 1)
-	srv := newCommandReportServerWithAuth(
-		t, received, "Bearer "+commandReportStoredToken, expectedCommandReportCLISource, agentNameCLI,
-	)
-	defer srv.Close()
-
-	requestReporter = reporting.NewReporter(reporting.Options{Endpoint: srv.URL})
-	reportSourceMode = ""
-	agentName = ""
-	Version = expectedCommandReportVersion
-	cmdStartTime = time.Now().Add(-time.Second)
-	reportCommandExecution(&cobra.Command{Use: commandReportCommandUse}, commandOutcomeSuccess, nil)
-	closeCommandReport(t)
-	event := receiveCommandReport(t, received)
-	assertCommandReportEvent(t, event, expectedCommandReportCLISource, agentNameCLI)
-}
-
-func runCommandReportTest(t *testing.T, sourceMode, reportAgent string, wantSource int32, wantAgent string) reporting.Event {
-	t.Helper()
-	restoreCommandReportGlobals(t)
-	received := make(chan reporting.Event, 1)
-	srv := newCommandReportServer(t, received, wantSource, wantAgent)
-	defer srv.Close()
-
-	configureCommandReport(sourceMode, reportAgent, srv.URL)
-	reportCommandExecution(&cobra.Command{Use: commandReportCommandUse}, commandOutcomeSuccess, nil)
-	closeCommandReport(t)
-	return receiveCommandReport(t, received)
-}
-
-func restoreCommandReportGlobals(t *testing.T) {
-	t.Helper()
+func TestReportAndCheckUpdateDoesNotReportCommandExecution(t *testing.T) {
 	oldReporter := requestReporter
-	oldSource := reportSourceMode
-	oldAgent := agentName
-	oldStart := cmdStartTime
-	oldVersion := Version
-	oldActiveCommand := activeCommand
 	oldCfg := cfg
-	oldTokenFile := tokenFile
+	oldOutputFormat := outputFormat
 	t.Cleanup(func() {
 		requestReporter = oldReporter
-		reportSourceMode = oldSource
-		agentName = oldAgent
-		cmdStartTime = oldStart
-		Version = oldVersion
-		activeCommand = oldActiveCommand
 		cfg = oldCfg
-		tokenFile = oldTokenFile
+		outputFormat = oldOutputFormat
 	})
-}
 
-func newCommandReportServer(t *testing.T, received chan<- reporting.Event, wantSource int32, wantAgent string) *httptest.Server {
-	t.Helper()
-	return newCommandReportServerWithAuth(t, received, commandReportAuthHeader, wantSource, wantAgent)
-}
-
-func newCommandReportServerWithAuth(
-	t *testing.T, received chan<- reporting.Event, wantAuth string, wantSource int32, wantAgent string,
-) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Authorization"); got != wantAuth {
-			t.Fatalf("Authorization = %q, want %s", got, wantAuth)
-		}
-		var raw map[string]map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
-			t.Fatalf("decode report request: %v", err)
-		}
-		assertReportPayloadRequiredFields(t, raw)
-
-		var payload struct {
-			Event reporting.Event `json:"event"`
-		}
-		encoded, _ := json.Marshal(raw)
-		if err := json.Unmarshal(encoded, &payload); err != nil {
-			t.Fatalf("unmarshal report request: %v", err)
-		}
-		if payload.Event.Source != wantSource || payload.Event.AgentName != wantAgent {
-			t.Fatalf("source metadata = %+v, want source %d agent %s", payload.Event, wantSource, wantAgent)
-		}
-		received <- payload.Event
+	received := make(chan struct{}, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received <- struct{}{}
 		w.WriteHeader(http.StatusOK)
 	}))
-}
+	defer srv.Close()
 
-func assertReportPayloadRequiredFields(t *testing.T, payload map[string]map[string]any) {
-	t.Helper()
-	event, ok := payload["event"]
-	if !ok {
-		t.Fatal("report payload must contain top-level event")
-	}
-	if got := event["source"]; got != float64(expectedCommandReportCLISource) && got != float64(expectedCommandReportSkillSource) {
-		t.Fatalf("event.source = %#v, want non-zero CLI or skill source", got)
-	}
-	if got := event["method"]; got != commandReportMethod {
-		t.Fatalf("event.method = %#v, want %q", got, commandReportMethod)
-	}
-	if got := event["api_path"]; got != commandReportAPIPath {
-		t.Fatalf("event.api_path = %#v, want %q", got, commandReportAPIPath)
-	}
-	if _, ok := event["request_body"].(map[string]any); ok {
-		t.Fatal("event.request_body must not be an object")
-	}
-	if _, ok := event["request_query"].(map[string]any); ok {
-		t.Fatal("event.request_query must not be an object")
-	}
-	if _, ok := event["response_body"].(map[string]any); ok {
-		t.Fatal("event.response_body must not be an object")
-	}
-}
+	requestReporter = reporting.NewReporter(reporting.Options{Endpoint: srv.URL, Token: "token-1"})
+	cfg = &config.Config{AutoUpdate: false}
+	outputFormat = formatJSON
 
-func saveCommandReportToken(t *testing.T) string {
-	t.Helper()
-	path := t.TempDir() + "/token.json"
-	store := &auth.TokenStore{
-		AccessToken: commandReportStoredToken,
-		ExpiresAt:   time.Now().Add(time.Hour),
-	}
-	if err := store.Save(path); err != nil {
-		t.Fatalf("save token: %v", err)
-	}
-	return path
-}
+	reportAndCheckUpdate(&cobra.Command{Use: "quote"})
 
-func configureCommandReport(sourceMode, reportAgent, endpoint string) {
-	requestReporter = reporting.NewReporter(reporting.Options{
-		Endpoint: endpoint,
-		Token:    commandReportToken,
-	})
-	reportSourceMode = sourceMode
-	agentName = reportAgent
-	Version = expectedCommandReportVersion
-	cmdStartTime = time.Now().Add(-time.Second)
-}
-
-func closeCommandReport(t *testing.T) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	if err := requestReporter.Close(ctx); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-	requestReporter = nil
-}
-
-func receiveCommandReport(t *testing.T, received <-chan reporting.Event) reporting.Event {
-	t.Helper()
 	select {
-	case event := <-received:
-		return event
-	case <-time.After(time.Second):
-		t.Fatal("expected command report request")
-	}
-	return reporting.Event{}
-}
-
-func assertCommandReportEvent(t *testing.T, event reporting.Event, wantSource int32, wantAgent string) {
-	t.Helper()
-	if event.Source != wantSource {
-		t.Fatalf("source = %d, want %d", event.Source, wantSource)
-	}
-	if event.AgentName != wantAgent {
-		t.Fatalf("agent_name = %q, want %q", event.AgentName, wantAgent)
-	}
-	if event.Platform != reportPlatformMoomoo {
-		t.Fatalf("platform = %q, want %q", event.Platform, reportPlatformMoomoo)
-	}
-	if event.Command != commandReportCommandUse {
-		t.Fatalf("command = %q, want %s", event.Command, commandReportCommandUse)
-	}
-	if event.Method != commandReportMethod {
-		t.Fatalf("method = %q, want %s", event.Method, commandReportMethod)
-	}
-	if event.APIPath != commandReportAPIPath {
-		t.Fatalf("api_path = %q, want %s", event.APIPath, commandReportAPIPath)
-	}
-	if event.ToolID != commandReportToolID {
-		t.Fatalf("tool_id = %q, want %q", event.ToolID, commandReportToolID)
-	}
-	if event.Outcome != commandOutcomeSuccess {
-		t.Fatalf("outcome = %q, want %q", event.Outcome, commandOutcomeSuccess)
-	}
-	if event.Version != expectedCommandReportVersion {
-		t.Fatalf("version = %q, want %q", event.Version, expectedCommandReportVersion)
-	}
-	if event.OS == "" || event.Arch == "" || event.DurationMs <= 0 {
-		t.Fatalf("expected os, arch and duration in event: %+v", event)
+	case <-received:
+		t.Fatal("command execution must not produce a report event")
+	case <-time.After(50 * time.Millisecond):
 	}
 }

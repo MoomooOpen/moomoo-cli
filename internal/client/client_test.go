@@ -371,14 +371,26 @@ func TestCallReportsSimTradeRequestEvent(t *testing.T) {
 		t.Fatalf("captured %d events, want 1", len(capture.events))
 	}
 	event := capture.events[0]
+	if event.Source != 8 {
+		t.Fatalf("source = %d, want 8", event.Source)
+	}
+	if event.Method != http.MethodPost {
+		t.Fatalf("method = %q, want POST", event.Method)
+	}
 	if event.ToolID != "sim_trade_input_order" {
 		t.Fatalf("tool id = %q, want sim_trade_input_order", event.ToolID)
+	}
+	if event.APIPath != "/api/v1.0/sim-trade/SIM-1/orders" {
+		t.Fatalf("api path = %q, want /api/v1.0/sim-trade/SIM-1/orders", event.APIPath)
 	}
 	if event.APIPathTemplate != "/api/v1.0/sim-trade/{acc_id}/orders" {
 		t.Fatalf("path template = %q", event.APIPathTemplate)
 	}
-	if event.Source != 8 {
-		t.Fatalf("source = %d, want 8", event.Source)
+	if !strings.Contains(event.RequestBody, `"symbol":"US.AAPL"`) {
+		t.Fatalf("request body = %q, want symbol", event.RequestBody)
+	}
+	if !strings.Contains(event.ResponseBody, `"order_id":"SIM-OID-1"`) {
+		t.Fatalf("response body = %q, want order id", event.ResponseBody)
 	}
 }
 

@@ -38,11 +38,6 @@ const (
 	reportSourceMoomooCLI   = "6"
 	reportSourceMoomooSkill = "8"
 	reportPlatformMoomoo    = "moomoo"
-	commandReportToolID     = "cli_command"
-	commandReportMethod     = "POST"
-	commandReportAPIPath    = "/cli/command"
-	commandOutcomeSuccess   = "success"
-	commandOutcomeFailure   = "failure"
 	internalSourceFlag      = "--source"
 	internalSourcePrefix    = "--source="
 	internalAgentFlag       = "--agent"
@@ -85,7 +80,6 @@ var (
 	cryptoSvc        *service.CryptoService
 	requestReporter  *reporting.Reporter
 	cmdStartTime     time.Time
-	activeCommand    *cobra.Command
 )
 
 var (
@@ -129,7 +123,6 @@ var rootCmd = &cobra.Command{
 	Long:  "moomoo CLI V1: REST API access for market data, trading, and crypto.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cmdStartTime = time.Now()
-		activeCommand = cmd
 		return initSharedState(cmd)
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
@@ -147,11 +140,7 @@ func Execute() error {
 	agentName = internal.agent
 	rootCmd.SetArgs(args)
 	defer flushRequestReporter()
-	err = rootCmd.Execute()
-	if err != nil {
-		reportCommandExecution(activeCommand, commandOutcomeFailure, err)
-	}
-	return err
+	return rootCmd.Execute()
 }
 
 func init() {
@@ -411,44 +400,13 @@ func initServices() {
 	cryptoSvc = service.NewCryptoService(httpClient)
 }
 
-// reportAndCheckUpdate flushes request reporting and prints an update notice if available.
+// reportAndCheckUpdate flushes interface-level request reporting and prints an update notice if available.
 func reportAndCheckUpdate(cmd *cobra.Command) {
 	defer flushRequestReporter()
-	reportCommandExecution(cmd, commandOutcomeSuccess, nil)
-
 	if cfg != nil && cfg.AutoUpdate && !isJSONOutput() {
 		update.NotifyIfAvailable(Version)
 		update.NotifyReleaseNotesIfVersionChanged(Version)
 	}
-}
-
-func reportCommandExecution(cmd *cobra.Command, outcome string, commandErr error) {
-	if requestReporter == nil || cmd == nil {
-		return
-	}
-	refreshRequestReporterToken()
-	reportSource, err := reportSourceHeaderValue()
-	if err != nil {
-		return
-	}
-	errorText := ""
-	if commandErr != nil {
-		errorText = commandErr.Error()
-	}
-	event := reporting.BuildEvent(reporting.BuildInput{
-		Source:     reportSource,
-		AgentName:  effectiveAgentName(),
-		Platform:   reportPlatformMoomoo,
-		Command:    cmd.CommandPath(),
-		Method:     commandReportMethod,
-		APIPath:    commandReportAPIPath,
-		DurationMs: commandDurationMillis(),
-		Error:      errorText,
-		Version:    Version,
-	})
-	event.ToolID = commandReportToolID
-	event.Outcome = outcome
-	requestReporter.Report(event)
 }
 
 func refreshRequestReporterToken() {
@@ -467,13 +425,6 @@ func storedReportToken() string {
 		return ""
 	}
 	return store.AccessToken
-}
-
-func commandDurationMillis() int64 {
-	if cmdStartTime.IsZero() {
-		return 0
-	}
-	return time.Since(cmdStartTime).Milliseconds()
 }
 
 func flushRequestReporter() {

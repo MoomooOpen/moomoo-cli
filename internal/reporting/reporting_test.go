@@ -22,6 +22,23 @@ func TestMatchToolRouteUsesMethodAndTemplate(t *testing.T) {
 	}
 }
 
+func TestBuildEventMatchesSimTradeFromActualPath(t *testing.T) {
+	event := BuildEvent(BuildInput{
+		Source:  "8",
+		Method:  http.MethodPost,
+		APIPath: "/api/v1.0/sim-trade/SIM-1/orders",
+	})
+	if event.ToolID != "sim_trade_input_order" {
+		t.Fatalf("tool id = %q, want sim_trade_input_order", event.ToolID)
+	}
+	if event.APIPath != "/api/v1.0/sim-trade/SIM-1/orders" {
+		t.Fatalf("api path = %q", event.APIPath)
+	}
+	if event.APIPathTemplate != "/api/v1.0/sim-trade/{acc_id}/orders" {
+		t.Fatalf("path template = %q", event.APIPathTemplate)
+	}
+}
+
 func TestExtractOrderIDPriority(t *testing.T) {
 	got := ExtractOrderID(
 		[]byte(`{"data":{"order_id":"from-response"}}`),

@@ -75,9 +75,9 @@ type BuildInput struct {
 
 func BuildEvent(input BuildInput) Event {
 	method := strings.ToUpper(input.Method)
-	route := MatchToolRoute(method, firstNonEmpty(input.APIPathTemplate, input.APIPath))
+	route := MatchToolRoute(method, input.APIPath)
 	if route.ID == "" {
-		route = MatchToolRoute(method, input.APIPath)
+		route = MatchToolRoute(method, input.APIPathTemplate)
 	}
 
 	toolID := unknownToolID
