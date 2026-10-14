@@ -1240,6 +1240,7 @@ var quoteRESTSpecs = []quoteRESTSpec{
 				Required: true,
 				Default:  "00700",
 				Source:   "query",
+				Flag:     quoteRESTKeywordFlag,
 			},
 			{
 				Name:    "size",
@@ -1285,6 +1286,7 @@ var quoteRESTSpecs = []quoteRESTSpec{
 				Required: true,
 				Default:  "00700",
 				Source:   "query",
+				Flag:     quoteRESTKeywordFlag,
 			},
 			{
 				Name:    "size",
@@ -1328,6 +1330,7 @@ var quoteRESTSpecs = []quoteRESTSpec{
 				Required: true,
 				Default:  "00700",
 				Source:   "query",
+				Flag:     quoteRESTKeywordFlag,
 			},
 			{
 				Name:    "size",

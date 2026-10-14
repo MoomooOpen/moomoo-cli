@@ -37,7 +37,10 @@ type quoteRESTParam struct {
 	Default  string
 	Source   string
 	Enum     string
+	Flag     string
 }
+
+const quoteRESTKeywordFlag = "keyword"
 
 func init() {
 	specs := loadQuoteRESTSpecs()
@@ -387,7 +390,7 @@ func quoteRESTAggregateExample(aggregate quoteRESTAggregate) string {
 	case "watchlist":
 		return "  moomoo watchlist\n  moomoo watchlist HK.00700 --action add --group-name All"
 	case "search":
-		return "  moomoo search US.AAPL\n  moomoo search AAPL --type community"
+		return "  moomoo search AAPL\n  moomoo search \"renewable energy\" --type community"
 	case "plate":
 		return "  moomoo plate\n  moomoo plate HK.LIST1045 --view stocks"
 	default:
@@ -408,7 +411,7 @@ func addQuoteRESTAggregateFlags(cmd *cobra.Command, aggregate quoteRESTAggregate
 			if skipQuoteRESTFlag(spec, p) {
 				continue
 			}
-			name := flagName(p.Name)
+			name := quoteRESTFlagName(p)
 			if cmd.Flags().Lookup(name) != nil {
 				continue
 			}
@@ -439,7 +442,7 @@ func addQuoteRESTAggregateFlags(cmd *cobra.Command, aggregate quoteRESTAggregate
 }
 
 func addQuoteRESTFlag(cmd *cobra.Command, p quoteRESTParam, kind string) {
-	name := flagName(p.Name)
+	name := quoteRESTFlagName(p)
 	usage := quoteRESTUsage(p)
 	switch kind {
 	case "int":
@@ -548,8 +551,8 @@ func quoteRESTExample(spec *quoteRESTSpec) string {
 }
 
 func quoteRESTUsage(p quoteRESTParam) string {
-	parts := []string{quoteRESTUsageName(p.Name)}
-	if isQuoteRESTSymbolParam(p.Name) {
+	parts := []string{quoteRESTUsageName(p)}
+	if shouldNormalizeQuoteRESTSymbol(p) {
 		parts = append(parts, "in MARKET.CODE format")
 	}
 	if p.Default != "" {
@@ -627,35 +630,12 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 		body["code_list"] = codes
 		hasBody = true
 	case "keyword":
-		keyword := "HK.00700"
-		field := spec.Extra
-		if field == "" {
-			field = "symbol"
-		}
-		if field == "keyword" {
-			keyword = "CPI"
-		}
-		for _, p := range spec.Params {
-			if p.Name == field && p.Default != "" {
-				keyword = resolveDateToken(p.Default)
-				break
-			}
-		}
-		if fv, err := cmd.Flags().GetString(flagName(field)); err == nil && fv != "" {
-			keyword = resolveDateToken(fv)
-		}
-		if len(args) > 0 {
-			keyword = args[0]
+		param, keyword, err := resolveQuoteRESTKeyword(cmd, args, spec)
+		if err != nil {
+			return err
 		}
 		if keyword != "" {
-			if isQuoteRESTSymbolParam(field) {
-				code, err := parseOneFutuCode(keyword)
-				if err != nil {
-					return err
-				}
-				keyword = code
-			}
-			putRESTValue(query, body, hasBody, quoteRESTParam{Name: field, Kind: "string", Source: "query", Required: true}, keyword)
+			putRESTValue(query, body, hasBody, param, keyword)
 		}
 	case "plate":
 		plate := "HK.LIST1045"
@@ -772,6 +752,55 @@ func isQuoteRESTSymbolParam(name string) bool {
 	}
 }
 
+func shouldNormalizeQuoteRESTSymbol(p quoteRESTParam) bool {
+	return isQuoteRESTSymbolParam(p.Name) && p.Flag != quoteRESTKeywordFlag
+}
+
+func resolveQuoteRESTKeyword(cmd *cobra.Command, args []string, spec *quoteRESTSpec) (quoteRESTParam, string, error) {
+	param := quoteRESTKeywordParam(spec)
+	keyword := defaultQuoteRESTKeyword(param)
+	if param.Default != "" {
+		keyword = resolveDateToken(param.Default)
+	}
+	if fv, err := cmd.Flags().GetString(quoteRESTFlagName(param)); err == nil && fv != "" {
+		keyword = resolveDateToken(fv)
+	}
+	if len(args) > 0 {
+		keyword = args[0]
+	}
+	if keyword != "" && shouldNormalizeQuoteRESTSymbol(param) {
+		code, err := parseOneFutuCode(keyword)
+		if err != nil {
+			return quoteRESTParam{}, "", err
+		}
+		keyword = code
+	}
+	param.Kind = "string"
+	param.Source = "query"
+	param.Required = true
+	return param, keyword, nil
+}
+
+func quoteRESTKeywordParam(spec *quoteRESTSpec) quoteRESTParam {
+	field := spec.Extra
+	if field == "" {
+		field = "symbol"
+	}
+	for _, p := range spec.Params {
+		if p.Name == field {
+			return p
+		}
+	}
+	return quoteRESTParam{Name: field}
+}
+
+func defaultQuoteRESTKeyword(p quoteRESTParam) string {
+	if p.Name == quoteRESTKeywordFlag {
+		return "CPI"
+	}
+	return "HK.00700"
+}
+
 func firstExecutiveName(cmd *cobra.Command, code string) (string, error) {
 	result, err := quoteSvc.Call(cmdContext(cmd), "quote.company_executives", client.CallOpts{
 		PathParams: map[string]string{"symbol": code},
@@ -794,7 +823,7 @@ func firstExecutiveName(cmd *cobra.Command, code string) (string, error) {
 }
 
 func readRESTFlag(cmd *cobra.Command, p quoteRESTParam) (any, bool, error) {
-	name := flagName(p.Name)
+	name := quoteRESTFlagName(p)
 	changed := cmd.Flags().Changed(name)
 	if !changed {
 		if p.Default != "" {
@@ -966,7 +995,7 @@ func parseRESTFlagString(name string, p quoteRESTParam, value string) (any, bool
 		}
 		return parsed, true, nil
 	}
-	if isQuoteRESTSymbolParam(p.Name) {
+	if shouldNormalizeQuoteRESTSymbol(p) {
 		code, err := parseOneFutuCode(value)
 		if err != nil {
 			return nil, false, err
@@ -1022,14 +1051,24 @@ func flagName(name string) string {
 	}
 }
 
-func quoteRESTUsageName(name string) string {
-	switch name {
+func quoteRESTFlagName(p quoteRESTParam) string {
+	if p.Flag != "" {
+		return p.Flag
+	}
+	return flagName(p.Name)
+}
+
+func quoteRESTUsageName(p quoteRESTParam) string {
+	if p.Flag != "" {
+		return p.Flag
+	}
+	switch p.Name {
 	case "stock_owner":
 		return "symbol"
 	case "filter_security":
 		return "filter-symbol"
 	default:
-		return name
+		return p.Name
 	}
 }
 
