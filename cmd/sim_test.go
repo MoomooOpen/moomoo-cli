@@ -1,6 +1,11 @@
 package cmd
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/spf13/cobra"
+)
 
 func TestSimCommandRegistration(t *testing.T) {
 	for _, args := range [][]string{
@@ -116,6 +121,71 @@ func TestBuildSimPlaceOrderBodyRejectsInvalidQuantity(t *testing.T) {
 
 	if _, err := buildSimPlaceOrderBody("US.AAPL", "0", orderSideBuy); err == nil {
 		t.Fatal("expected invalid quantity error")
+	}
+}
+
+func TestSimModifyFlagsAreRequired(t *testing.T) {
+	for _, name := range []string{"qty", "price"} {
+		flag := simOrderModifyCmd.Flags().Lookup(name)
+		if flag == nil {
+			t.Fatalf("flag %s is not registered", name)
+		}
+		if len(flag.Annotations[cobra.BashCompOneRequiredFlag]) == 0 {
+			t.Fatalf("flag %s is not marked required", name)
+		}
+	}
+}
+
+func TestApplySimModifyBodyRequiresQuantityAndPrice(t *testing.T) {
+	tests := []struct {
+		name     string
+		quantity string
+		price    string
+		wantErr  string
+		wantBody map[string]any
+	}{
+		{
+			name:    "missing quantity",
+			price:   "181",
+			wantErr: simModifyQtyRequiredError,
+		},
+		{
+			name:     "missing price",
+			quantity: "3",
+			wantErr:  simModifyPriceRequiredError,
+		},
+		{
+			name:     "complete modify body",
+			quantity: "3",
+			price:    "181",
+			wantBody: map[string]any{
+				simFieldNewQuantity: "3",
+				simFieldNewPrice:    "181",
+			},
+		},
+	}
+
+	oldFlags := simFlags
+	defer func() { simFlags = oldFlags }()
+	for _, test := range tests {
+		simFlags.quantity = test.quantity
+		simFlags.price = test.price
+		body := map[string]any{}
+		err := applySimModifyBody(body)
+		if test.wantErr != "" {
+			if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+				t.Fatalf("%s: error = %v, want %q", test.name, err, test.wantErr)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("%s: applySimModifyBody() error = %v", test.name, err)
+		}
+		for key, want := range test.wantBody {
+			if got := body[key]; got != want {
+				t.Fatalf("%s: body[%s] = %#v, want %#v", test.name, key, got, want)
+			}
+		}
 	}
 }
 

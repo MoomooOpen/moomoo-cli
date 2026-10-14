@@ -228,7 +228,7 @@ Simulated trading commands use a dedicated simulated account ID. If `--account` 
 | `moomoo sim order buy <symbol> <qty>` | Submit a simulated buy order. | `--account`, `--market`, `--type`, `--price`, `--session`, `--text` |
 | `moomoo sim order sell <symbol> <qty>` | Submit a simulated sell order. | Same core order options as `sim order buy`. |
 | `moomoo sim order place <qty>` | Submit a generic simulated order. | `--symbol`, `--side`, `--account`, `--market`, `--type`, `--price` |
-| `moomoo sim order modify <order-id>` | Modify a simulated order. | `--account`, `--market`, `--qty`, `--price` |
+| `moomoo sim order modify <order-id>` | Modify a simulated order. | `--account`, `--market`, required `--qty`, required `--price` |
 | `moomoo sim order cancel <order-id>` | Cancel a simulated order. | `--account`, `--market`, `--format json` |
 | `moomoo sim order list` | List open simulated orders. | `--account`, `--market`, `--format json` |
 | `moomoo sim order history` | List historical simulated orders. | `--account`, `--market`, `--start`, `--end`, `--page-size`, `--next-key` |
