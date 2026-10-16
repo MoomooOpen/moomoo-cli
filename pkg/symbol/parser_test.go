@@ -22,6 +22,11 @@ func TestParseMarketCodeSymbol(t *testing.T) {
 			want:  &Symbol{Market: MarketUS, Code: "AAPL", Full: "US.AAPL"},
 		},
 		{
+			name:  "us class code keeps embedded dot",
+			input: "US.BRK.B",
+			want:  &Symbol{Market: MarketUS, Code: "BRK.B", Full: "US.BRK.B"},
+		},
+		{
 			name:  "china market keeps six digit code",
 			input: "SH.600519",
 			want:  &Symbol{Market: MarketSH, Code: "600519", Full: "SH.600519"},

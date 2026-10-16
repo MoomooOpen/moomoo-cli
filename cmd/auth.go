@@ -520,6 +520,9 @@ func unixTimePointer(value time.Time) *int64 {
 
 func printAuthStatus(status authStatusData) error {
 	printResult(status, func() { renderStatusTable(status) })
+	if status.Token.Status != statusLoggedIn {
+		return errors.New(status.Token.Status)
+	}
 	return nil
 }
 

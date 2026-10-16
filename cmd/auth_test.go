@@ -157,6 +157,27 @@ func TestNewAuthStatusWithoutToken(t *testing.T) {
 	}
 }
 
+func TestPrintAuthStatusReturnsErrorWhenNotLoggedIn(t *testing.T) {
+	oldOutputFormat := outputFormat
+	oldStdout := os.Stdout
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("open dev null: %v", err)
+	}
+	os.Stdout = devNull
+	outputFormat = formatJSON
+	t.Cleanup(func() {
+		outputFormat = oldOutputFormat
+		os.Stdout = oldStdout
+		devNull.Close()
+	})
+
+	status := newAuthStatus(nil, "/tmp/token.enc")
+	if err := printAuthStatus(status); err == nil {
+		t.Fatal("expected not logged in error")
+	}
+}
+
 func TestRunLogoutDeletesLocalToken(t *testing.T) {
 	keyring.MockInit()
 	previousTokenFile := tokenFile

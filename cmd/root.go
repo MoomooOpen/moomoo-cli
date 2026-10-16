@@ -155,11 +155,16 @@ func init() {
 // initSharedState loads config, ensures auth (when needed), and initializes
 // the HTTP client and services.
 func initSharedState(cmd *cobra.Command) error {
+	normalizedFormat, err := normalizeOutputFormat(outputFormat)
+	if err != nil {
+		return err
+	}
+	outputFormat = normalizedFormat
+
 	if commandOrParentMatches(cmd, noConfigCommands) {
 		newRequestReporter("")
 		return nil
 	}
-	var err error
 	cfg, err = config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -440,6 +445,17 @@ func flushRequestReporter() {
 // isJSONOutput returns true when the user requested JSON output format.
 func isJSONOutput() bool {
 	return outputFormat == formatJSON
+}
+
+func normalizeOutputFormat(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case formatTable:
+		return formatTable, nil
+	case formatJSON:
+		return formatJSON, nil
+	default:
+		return "", fmt.Errorf("unsupported output format %q; use %s or %s", value, formatTable, formatJSON)
+	}
 }
 
 // printResult outputs data either as JSON or via the provided table renderer.

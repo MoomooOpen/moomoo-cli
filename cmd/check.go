@@ -68,7 +68,7 @@ func runCheck(_ *cobra.Command, _ []string) error {
 		Connectivity: connectivityCheck{API: <-connectivityCh},
 	}
 	printResult(result, func() { renderCheckTable(result) })
-	return nil
+	return checkResultError(result)
 }
 
 func diagnosticHTTPClient() *http.Client {
@@ -123,6 +123,13 @@ func tokenStatusFromPermissions(permissions auth.PermissionInfo) sessionCheck {
 		return sessionCheck{Token: tokenValid, Detail: tokenDetailPermissionAvailable}
 	}
 	return sessionCheck{Token: tokenUnknown, Detail: tokenDetailNoPermission}
+}
+
+func checkResultError(result checkResult) error {
+	if result.Session.Token == tokenValid {
+		return nil
+	}
+	return fmt.Errorf("token %s", result.Session.Token)
 }
 
 func renderCheckTable(result checkResult) {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -193,4 +194,52 @@ func TestParsePositiveSimQuantityRejectsNaN(t *testing.T) {
 	if _, err := parsePositiveSimQuantity("NaN"); err == nil {
 		t.Fatal("expected invalid NaN quantity error")
 	}
+}
+
+func TestRequireSimMutationOrderIDRejectsZero(t *testing.T) {
+	data := decodeSimTestJSON(t, `{"order_id":"0"}`)
+	if _, err := requireSimMutationOrderID(data, simActionPlaceOrder); err == nil {
+		t.Fatal("expected invalid order_id error")
+	}
+}
+
+func TestRequireSimMutationOrderIDAcceptsNonZero(t *testing.T) {
+	data := decodeSimTestJSON(t, `{"order_id":"S123"}`)
+	orderID, err := requireSimMutationOrderID(data, simActionPlaceOrder)
+	if err != nil {
+		t.Fatalf("requireSimMutationOrderID() error = %v", err)
+	}
+	if orderID != "S123" {
+		t.Fatalf("orderID = %q, want S123", orderID)
+	}
+}
+
+func TestSimOrderListContainsOrderFromWrappedOrders(t *testing.T) {
+	data := decodeSimTestJSON(t, `{"orders":[{"order_id":"S123"}]}`)
+	if !simOrderListContainsOrder(data, "S123") {
+		t.Fatal("expected wrapped order list to contain S123")
+	}
+}
+
+func TestSimOrderListContainsOrderFromTopLevelArray(t *testing.T) {
+	data := decodeSimTestJSON(t, `[{"order_id":"S123"}]`)
+	if !simOrderListContainsOrder(data, "S123") {
+		t.Fatal("expected top-level order list to contain S123")
+	}
+}
+
+func TestSimOrderListContainsOrderReturnsFalseWhenMissing(t *testing.T) {
+	data := decodeSimTestJSON(t, `{"orders":[{"order_id":"S999"}]}`)
+	if simOrderListContainsOrder(data, "S123") {
+		t.Fatal("unexpectedly found missing order S123")
+	}
+}
+
+func decodeSimTestJSON(t *testing.T, raw string) any {
+	t.Helper()
+	var data any
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		t.Fatalf("decode test JSON: %v", err)
+	}
+	return data
 }

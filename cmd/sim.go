@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/MoomooOpen/moomoo-cli/internal/client"
+	"github.com/MoomooOpen/moomoo-cli/internal/service"
 	"github.com/MoomooOpen/moomoo-cli/pkg/symbol"
 )
 
@@ -49,6 +50,7 @@ const (
 	simFieldNextKey             = "next_key"
 	simFieldNewQuantity         = "new_qty"
 	simFieldNewPrice            = "new_price"
+	simFieldOrderIDCamel        = "orderId"
 	defaultSimMarket            = "HK"
 	defaultSimOrderType         = "market"
 	defaultSimHistoryPageSize   = 50
@@ -64,6 +66,9 @@ const (
 	simTradeTimeTypeExtended    = 2
 	simQuantityParseBitSize     = 64
 	simQuantityParseBase        = 10
+	simInvalidOrderID           = "0"
+	simActionPlaceOrder         = "place simulated order"
+	simActionModifyOrder        = "modify simulated order"
 	simModifyQtyRequiredError   = "--qty is required"
 	simModifyPriceRequiredError = "--price is required"
 )
@@ -297,7 +302,15 @@ func runSimPlaceOrder(cmd *cobra.Command, rawSymbol, rawQty, side string) error 
 	if err != nil {
 		return err
 	}
-	return callSimEndpoint(cmd, simEndpointInputOrder, "", opts)
+	result, err := callSimEndpointResult(cmd, simEndpointInputOrder, opts)
+	if err != nil {
+		return err
+	}
+	if _, err := requireSimMutationOrderID(decodeJSONValue(result.Data), simActionPlaceOrder); err != nil {
+		return err
+	}
+	printSimResult(result, "")
+	return nil
 }
 
 func runSimModifyOrder(cmd *cobra.Command, args []string) error {
@@ -305,7 +318,19 @@ func runSimModifyOrder(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return callSimEndpoint(cmd, simEndpointModifyOrder, "", opts)
+	result, err := callSimEndpointResult(cmd, simEndpointModifyOrder, opts)
+	if err != nil {
+		return err
+	}
+	orderID, err := requireSimMutationOrderID(decodeJSONValue(result.Data), simActionModifyOrder)
+	if err != nil {
+		return err
+	}
+	if err := confirmSimModifiedOrder(cmd, opts.PathParams[simFieldAccountID], orderID); err != nil {
+		return err
+	}
+	printSimResult(result, "")
+	return nil
 }
 
 func runSimCancelOrder(cmd *cobra.Command, args []string) error {
@@ -551,14 +576,89 @@ func firstSimAccountID(cmd *cobra.Command) (string, error) {
 }
 
 func callSimEndpoint(cmd *cobra.Command, id, wrap string, opts client.CallOpts) error {
+	result, err := callSimEndpointResult(cmd, id, opts)
+	if err != nil {
+		return err
+	}
+	printSimResult(result, wrap)
+	return nil
+}
+
+func callSimEndpointResult(cmd *cobra.Command, id string, opts client.CallOpts) (*service.BFFResult, error) {
 	result, err := quoteSvc.Call(cmdContext(cmd), id, opts)
 	if err != nil {
-		return fmt.Errorf("calling %s: %w", id, err)
+		return nil, fmt.Errorf("calling %s: %w", id, err)
 	}
+	return result, nil
+}
+
+func printSimResult(result *service.BFFResult, wrap string) {
 	printBFFResult(result, func() {
 		renderQuoteRESTTable(decodeJSONValue(result.Data), wrap)
 	})
-	return nil
+}
+
+func requireSimMutationOrderID(data any, action string) (string, error) {
+	orderID := simMutationOrderID(data)
+	if orderID == "" || orderID == simInvalidOrderID {
+		return "", fmt.Errorf("%s failed: invalid %s %q", action, simFieldOrderID, orderID)
+	}
+	return orderID, nil
+}
+
+func simMutationOrderID(data any) string {
+	object, _ := data.(map[string]any)
+	return simObjectOrderID(object)
+}
+
+func simObjectOrderID(object map[string]any) string {
+	for _, key := range []string{simFieldOrderID, simFieldOrderIDCamel} {
+		if orderID := strings.TrimSpace(jsonString(object, key)); orderID != "" {
+			return orderID
+		}
+	}
+	return ""
+}
+
+func confirmSimModifiedOrder(cmd *cobra.Command, account, orderID string) error {
+	opts, err := simOrderListOpts(account)
+	if err != nil {
+		return err
+	}
+	result, err := callSimEndpointResult(cmd, simEndpointOrderList, opts)
+	if err != nil {
+		return err
+	}
+	if simOrderListContainsOrder(decodeJSONValue(result.Data), orderID) {
+		return nil
+	}
+	return fmt.Errorf("modified simulated order %q was not found; order may not have been modified", orderID)
+}
+
+func simOrderListOpts(account string) (client.CallOpts, error) {
+	market, err := simMarketValue(simFlags.market)
+	if err != nil {
+		return client.CallOpts{}, err
+	}
+	query := url.Values{}
+	query.Set(simFieldMarket, strconv.Itoa(market))
+	return client.CallOpts{
+		PathParams: map[string]string{simFieldAccountID: account},
+		Params:     query,
+	}, nil
+}
+
+func simOrderListContainsOrder(data any, orderID string) bool {
+	target := strings.TrimSpace(orderID)
+	if target == "" {
+		return false
+	}
+	for _, item := range extractObjectList(data, simWrapOrders) {
+		if simObjectOrderID(item) == target {
+			return true
+		}
+	}
+	return false
 }
 
 func parseSimOrderIdentity(rawSymbol, rawQty string) (string, string, error) {

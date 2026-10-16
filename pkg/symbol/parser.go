@@ -76,7 +76,7 @@ func ParseMulti(inputs []string) ([]*Symbol, error) {
 
 // splitSymbol splits a moomoo-format symbol into (code, market).
 func splitSymbol(input string) (string, string, error) {
-	idx := strings.LastIndex(input, ".")
+	idx := strings.Index(input, ".")
 	if idx <= 0 || idx == len(input)-1 {
 		return "", "", fmt.Errorf("symbol must use MARKET.CODE format, for example HK.00700 or US.AAPL")
 	}

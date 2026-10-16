@@ -41,3 +41,17 @@ func TestReportAndCheckUpdateDoesNotReportCommandExecution(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 }
+
+func TestNormalizeOutputFormat(t *testing.T) {
+	got, err := normalizeOutputFormat("JSON")
+	if err != nil {
+		t.Fatalf("normalizeOutputFormat() error = %v", err)
+	}
+	if got != formatJSON {
+		t.Fatalf("format = %q, want %q", got, formatJSON)
+	}
+
+	if _, err := normalizeOutputFormat("josn"); err == nil {
+		t.Fatal("expected invalid output format error")
+	}
+}

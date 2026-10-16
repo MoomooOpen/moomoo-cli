@@ -40,3 +40,17 @@ func TestTokenStatusFromPermissions(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckResultErrorFailsWhenTokenIsNotValid(t *testing.T) {
+	result := checkResult{Session: sessionCheck{Token: tokenMissing}}
+	if err := checkResultError(result); err == nil {
+		t.Fatal("expected missing token error")
+	}
+}
+
+func TestCheckResultErrorPassesForValidToken(t *testing.T) {
+	result := checkResult{Session: sessionCheck{Token: tokenValid}}
+	if err := checkResultError(result); err != nil {
+		t.Fatalf("checkResultError() error = %v", err)
+	}
+}
