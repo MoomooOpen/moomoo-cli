@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/MoomooOpen/moomoo-cli/internal/dryrun"
 	"github.com/MoomooOpen/moomoo-cli/internal/output"
 	"github.com/MoomooOpen/moomoo-cli/internal/service"
 )
@@ -135,6 +136,7 @@ var orderFlags struct {
 	session      string
 	orderClass   string
 	multiLegInfo string
+	execute      string
 }
 
 var orderCmd = &cobra.Command{
@@ -146,7 +148,7 @@ var orderCmd = &cobra.Command{
 var orderBuyCmd = &cobra.Command{
 	Use:   "buy <symbol> <qty>",
 	Short: "Place a buy order",
-	Long:  "Place a securities buy order, including limit and market orders. Symbol must use MARKET.CODE format, for example HK.00700 or US.AAPL.",
+	Long:  "Preview a buy order by default. Re-run with --execute <confirmation_code> to submit. Supports limit and market orders.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPlaceOrder(cmd, args, orderSideBuy)
@@ -156,7 +158,7 @@ var orderBuyCmd = &cobra.Command{
 var orderSellCmd = &cobra.Command{
 	Use:   "sell <symbol> <qty>",
 	Short: "Place a sell order",
-	Long:  "Place a securities sell order, including limit and market orders. Symbol must use MARKET.CODE format, for example HK.00700 or US.AAPL.",
+	Long:  "Preview a sell order by default. Re-run with --execute <confirmation_code> to submit. Supports limit and market orders.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPlaceOrder(cmd, args, orderSideSell)
@@ -166,7 +168,7 @@ var orderSellCmd = &cobra.Command{
 var orderPlaceCmd = &cobra.Command{
 	Use:   "place <qty>",
 	Short: "Place a securities order",
-	Long:  "Place short-sell, buy-back, conditional, and multi-leg securities orders. Non-multi-leg orders require --symbol.",
+	Long:  "Preview a securities order by default. Re-run with --execute <confirmation_code> to submit. Supports sell-short, buy-back, conditional, and multi-leg orders. Non-multi-leg orders require --symbol.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runGenericPlaceOrder,
 }
@@ -174,7 +176,7 @@ var orderPlaceCmd = &cobra.Command{
 var orderCancelCmd = &cobra.Command{
 	Use:   "cancel <order-id>",
 	Short: "Cancel an order",
-	Long:  "Cancel the specified open order.",
+	Long:  "Preview cancellation by default. Re-run with --execute <confirmation_code> to cancel the specified open order.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCancelOrder,
 }
@@ -182,7 +184,7 @@ var orderCancelCmd = &cobra.Command{
 var orderModifyCmd = &cobra.Command{
 	Use:   "modify <order-id>",
 	Short: "Modify an order",
-	Long:  "Modify the quantity, price, or trigger price of an order.",
+	Long:  "Preview an order modification by default. Re-run with --execute <confirmation_code> to modify quantity, price, or conditional trigger price.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runModifyOrder,
 }
@@ -229,6 +231,11 @@ func init() {
 	registerHistoryOrderFlags(orderHistoryCmd)
 	registerDetailOrderFlags(orderDetailCmd)
 	registerMaxQtyFlags(orderMaxQtyCmd)
+	registerExecuteFlag(orderBuyCmd, &orderFlags.execute)
+	registerExecuteFlag(orderSellCmd, &orderFlags.execute)
+	registerExecuteFlag(orderPlaceCmd, &orderFlags.execute)
+	registerExecuteFlag(orderModifyCmd, &orderFlags.execute)
+	registerExecuteFlag(orderCancelCmd, &orderFlags.execute)
 
 	orderCmd.AddCommand(orderBuyCmd, orderSellCmd, orderPlaceCmd, orderModifyCmd, orderCancelCmd, orderListCmd, orderHistoryCmd, orderDetailCmd, orderMaxQtyCmd)
 	rootCmd.AddCommand(orderCmd)
@@ -320,16 +327,42 @@ func runPlaceOrder(cmd *cobra.Command, args []string, side string) error {
 	if err != nil {
 		return err
 	}
+	proceed, err := gateTradeExecution(
+		dryrun.Order(req.Side, req.Code, formatQty(req.Qty), req.Price),
+		orderFlags.execute,
+		placeOrderPreview(req),
+	)
+	if err != nil || !proceed {
+		return err
+	}
 	return submitOrder(cmd, req)
 }
 
-// buildPlaceOrderRequest parses arguments and flags into a PlaceOrderRequest.
 func runGenericPlaceOrder(cmd *cobra.Command, args []string) error {
 	req, err := buildPlaceOrderRequest(orderFlags.symbol, args[0], orderFlags.side)
 	if err != nil {
 		return err
 	}
+	proceed, err := gateTradeExecution(
+		dryrun.Order(req.Side, req.Code, formatQty(req.Qty), req.Price),
+		orderFlags.execute,
+		placeOrderPreview(req),
+	)
+	if err != nil || !proceed {
+		return err
+	}
 	return submitOrder(cmd, req)
+}
+
+func placeOrderPreview(req service.PlaceOrderRequest) map[string]any {
+	return map[string]any{
+		"side":    req.Side,
+		"symbol":  req.Code,
+		"qty":     req.Qty,
+		"type":    req.OrderType,
+		"price":   req.Price,
+		"account": req.Account,
+	}
 }
 
 func buildPlaceOrderRequest(rawSymbol, rawQty, side string) (service.PlaceOrderRequest, error) {
@@ -490,6 +523,23 @@ func runModifyOrder(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	proceed, err := gateTradeExecution(
+		dryrun.Replace(args[0], formatQty(req.Qty), req.Price),
+		orderFlags.execute,
+		map[string]any{
+			"action":    "modify",
+			"order_id":  args[0],
+			"qty":       req.Qty,
+			"price":     req.Price,
+			"aux_price": req.AuxPrice,
+			"exchange":  req.Exchange,
+			"account":   req.Account,
+		},
+	)
+	if err != nil || !proceed {
+		return err
+	}
+
 	ctx := cmdContext(cmd)
 	order, err := tradeSvc.ModifyOrder(ctx, args[0], req)
 	if err != nil {
@@ -618,6 +668,19 @@ func runCancelOrder(cmd *cobra.Command, args []string) error {
 	orderID := args[0]
 	req, err := buildCancelOrderRequest()
 	if err != nil {
+		return err
+	}
+	proceed, err := gateTradeExecution(
+		dryrun.OnOrder("cancel", orderID),
+		orderFlags.execute,
+		map[string]any{
+			"action":   "cancel",
+			"order_id": orderID,
+			"exchange": req.Exchange,
+			"account":  req.Account,
+		},
+	)
+	if err != nil || !proceed {
 		return err
 	}
 	ctx := cmdContext(cmd)

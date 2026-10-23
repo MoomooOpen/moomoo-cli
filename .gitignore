@@ -3,7 +3,10 @@
 /skills/
 /npm/vendor/
 /dist/
+/.cache/
 /moomoo
 *.log
 [Tt][Oo][Dd][Oo].md
 /v[0-9]*/
+keys/*.key
+keys/*.key.*

@@ -39,6 +39,7 @@ func TestBuildPlaceOrderRequestDefaultsToMarketOrder(t *testing.T) {
 		session      string
 		orderClass   string
 		multiLegInfo string
+		execute      string
 	}{typ: defaultOrderType, timeInForce: defaultTimeInForce}
 
 	req, err := buildPlaceOrderRequest("US.AAPL", "10", orderSideBuy)
@@ -81,6 +82,7 @@ func TestBuildPlaceOrderRequestNormalizesHKSymbol(t *testing.T) {
 		session      string
 		orderClass   string
 		multiLegInfo string
+		execute      string
 	}{typ: defaultOrderType, timeInForce: defaultTimeInForce}
 
 	req, err := buildPlaceOrderRequest("HK.700", "10", orderSideBuy)

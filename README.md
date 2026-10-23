@@ -111,7 +111,7 @@ moomoo crypto balance --account <account-id> --format json
 moomoo crypto order history --account <account-id> --symbol BTCUSD --format json
 ```
 
-Trading commands such as `order buy`, `order sell`, `order modify`, and `order cancel` operate on real accounts and require local confirmation before submission.
+Securities and crypto order writes default to dry-run. The first call validates and previews the request, returns a three-digit confirmation code, and does not submit. Re-run the same command with `--execute <code>` to place, modify, or cancel.
 
 ## Update
 
@@ -158,6 +158,12 @@ default_account
 auto_update
 ```
 
+## Telemetry
+
+Each API call is reported to `https://ai-report.moomoo.com` so a failed or slow command can be traced back to your account without asking you to copy logs. The report is sent with the same OAuth access token as the call, which lets support match it to the session that just ran, see whether the CLI or an agent sent an invalid request, and tell you if your installed version is out of date.
+
+A report includes the command name, HTTP method, API path, status code, duration, CLI version, operating system, architecture, agent name, and the sanitized request and response. Token, password, and secret fields are removed. Securities, account, and crypto trading payloads are masked. Quote and other calls keep the remaining request and response fields, including order IDs, so a specific request can be identified when you ask for help. There is no setting to turn reporting off.
+
 ## Command Reference
 
 This section summarizes the supported authentication, market data, securities trading, and cryptocurrency trading commands. Use `--format json` when consuming command output from scripts.
@@ -203,19 +209,26 @@ Additional quote REST commands include aggregated views such as `broker`, `capit
 
 ### Securities Orders and Trades
 
+Securities order writes default to dry-run. Preview first, then re-run with `--execute <confirmation_code>` to submit.
+
 | Command | Purpose | Key options |
 | --- | --- | --- |
-| `moomoo order buy <symbol> <qty>` | Submit a securities buy order. | `--account`, `--price`, `--type`, `--time-in-force`, `--lot-type`, `--session`, `--remark` |
-| `moomoo order sell <symbol> <qty>` | Submit a securities sell order. | Same core order options as `order buy`. |
-| `moomoo order place <qty>` | Submit advanced securities orders. | `--symbol`, `--side`, `--order-class`, `--multi-leg-info`; supports `BUY`, `SELL`, `SELL_SHORT`, `BUY_BACK`, conditional, and multi-leg orders. |
-| `moomoo order modify <order-id>` | Modify quantity, price, or trigger price. | `--account`, `--exchange`, `--qty`, `--price`, `--aux-price` |
-| `moomoo order cancel <order-id>` | Cancel an order. | `--account`, `--exchange` |
+| `moomoo order buy <symbol> <qty>` | Preview a securities buy order; submit with `--execute`. | `--account`, `--price`, `--type`, `--time-in-force`, `--lot-type`, `--session`, `--remark`, `--execute` |
+| `moomoo order sell <symbol> <qty>` | Preview a securities sell order; submit with `--execute`. | Same core order options as `order buy`. |
+| `moomoo order place <qty>` | Preview advanced securities orders; submit with `--execute`. | `--symbol`, `--side`, `--order-class`, `--multi-leg-info`; supports `BUY`, `SELL`, `SELL_SHORT`, `BUY_BACK`, conditional, and multi-leg orders. |
+| `moomoo order modify <order-id>` | Preview quantity, price, or trigger price changes; submit with `--execute`. | `--account`, `--exchange`, `--qty`, `--price`, `--aux-price`, `--execute` |
+| `moomoo order cancel <order-id>` | Preview cancel; submit with `--execute`. | `--account`, `--exchange`, `--execute` |
 | `moomoo order list --account <account-id> --market <market>` | List open orders and recent related orders. | `--page-size`, `--format json` |
 | `moomoo order history --account <account-id> --market <market>` | List historical orders. | `--symbol`, `--start`, `--end`, `--page-size`, `--format json` |
 | `moomoo order detail <order-id> [order-id...]` | Show detailed order information for up to 100 order IDs. | `--account`, `--exchange`, `--format json` |
 | `moomoo order max-qty <symbol>` | Query maximum cash buy, margin buy, position sell, short sell, and buy-back quantities. | `--account`, `--type`, `--price`, `--order-id`, `--format json` |
 | `moomoo deal --account <account-id> --market <market>` | List today's trades. | `--page-size`, `--format json` |
 | `moomoo deal history --account <account-id> --market <market>` | List historical trades. | `--symbol`, `--start`, `--end`, `--page-size`, `--format json` |
+
+```bash
+moomoo order buy US.AAPL 1 --type limit --price 180
+moomoo order buy US.AAPL 1 --type limit --price 180 --execute 203
+```
 
 ### Simulated Trading
 
@@ -244,11 +257,11 @@ See `.local_docs/moomoo-cli/docs/sim-trading-cli-guide.md` for the full simulate
 | `moomoo crypto account list` | List authorized cryptocurrency trading accounts. | Add `--format json` for scripts. |
 | `moomoo crypto balance --account <account-id>` | Show total crypto account assets, including cash balances and digital asset positions. | `--format json` |
 | `moomoo crypto max-qty <symbol>` | Query maximum cash-buy quantity, sell quantity, and cash-buy amount for a cryptocurrency pair. | `--account`, `--type`, `--currency`, `--coin`, `--price`, `--format json` |
-| `moomoo crypto order place <symbol>` | Submit a cryptocurrency order with explicit side. | `--side`, `--account`, `--req-id`, `--type`, `--time-in-force`, `--price`, `--qty`, `--cash-qty`, `--conditional-info` |
-| `moomoo crypto order buy <symbol>` | Submit a cryptocurrency buy order. | Same core order options as `crypto order place`, without `--side`. |
-| `moomoo crypto order sell <symbol>` | Submit a cryptocurrency sell order. | Same core order options as `crypto order place`, without `--side`; sell does not support `--cash-qty`. |
-| `moomoo crypto order modify <order-id>` | Modify a crypto order. | `--account`, `--req-id`, `--price`, `--qty`, `--order-version`, `--conditional-info` |
-| `moomoo crypto order cancel <order-id>` | Cancel a crypto order. | `--account`, `--req-id`, `--format json` |
+| `moomoo crypto order place <symbol>` | Preview a cryptocurrency order with explicit side; submit with `--execute`. | `--side`, `--account`, `--req-id`, `--type`, `--time-in-force`, `--price`, `--qty`, `--cash-qty`, `--conditional-info`, `--execute` |
+| `moomoo crypto order buy <symbol>` | Preview a cryptocurrency buy order; submit with `--execute`. | Same core order options as `crypto order place`, without `--side`. |
+| `moomoo crypto order sell <symbol>` | Preview a cryptocurrency sell order; submit with `--execute`. | Same core order options as `crypto order place`, without `--side`; sell does not support `--cash-qty`. |
+| `moomoo crypto order modify <order-id>` | Preview a crypto order modification; submit with `--execute`. | `--account`, `--req-id`, `--price`, `--qty`, `--order-version`, `--conditional-info`, `--execute` |
+| `moomoo crypto order cancel <order-id>` | Preview cancel; submit with `--execute`. | `--account`, `--req-id`, `--execute`, `--format json` |
 | `moomoo crypto order list` | List open cryptocurrency orders. | `--account`, `--page-size`, `--page-flag`, `--format json` |
 | `moomoo crypto order history` | List historical cryptocurrency orders. | `--account`, `--symbol`, `--start`, `--end`, `--order-status`, `--currency`, `--side`, `--type`, `--page-size`, `--page-flag`, `--format json` |
 | `moomoo crypto order detail <order-id> [order-id...]` | Show details for up to 20 cryptocurrency order IDs. | `--account`, `--format json` |
@@ -261,13 +274,13 @@ Most trading commands accept `--account` and fall back to `default_account` when
 
 Securities symbol arguments and `--symbol` filters use `MARKET.CODE`, such as `HK.00700` and `US.AAPL`. Hong Kong numeric codes are normalized to five digits, so `HK.700` is sent as `HK.00700`. Cryptocurrency commands use trading pairs such as `BTCUSD` and `ETHHKD`.
 
-Order placement, modification, and cancellation operate on real accounts. The CLI prints an order summary and requires local confirmation before submitting supported trading operations.
+Order placement, modification, and cancellation on real securities and crypto accounts default to dry-run. Use `--execute <confirmation_code>` to submit. Simulated trading (`sim order`) is not gated.
 
 ## Release Assets
 
 Official releases are published from GitHub Actions. The release tag, GitHub Release, binary version, and asset names must use the same version, for example `v0.1.0`.
 
-Each release includes platform archives and one checksum file:
+Each release includes platform archives, a checksum file, and an ECDSA signature over the checksum file:
 
 ```text
 moomoo_v0.1.0_darwin_amd64.tar.gz
@@ -278,7 +291,10 @@ moomoo_v0.1.0_linux_musl_amd64.tar.gz
 moomoo_v0.1.0_linux_musl_arm64.tar.gz
 moomoo_v0.1.0_windows_amd64.zip
 moomoo_checksums.txt
+moomoo_checksums.txt.sig
 ```
+
+Installers and `moomoo update` verify `moomoo_checksums.txt.sig` with the embedded release public key before trusting checksums or replacing the binary. Archives also include a `VERSION` file that is checked without executing the downloaded binary.
 
 ## Development
 

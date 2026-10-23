@@ -12,18 +12,20 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sync"
 
 	"github.com/zalando/go-keyring"
 )
 
 const (
-	tokenFilePermissions  = 0o600
-	temporaryTokenPattern = ".moomoo-token-*"
-	keyringService        = "moomoo"
-	keyringUser           = "default"
-	encryptionKeyUser     = "token-encryption-key"
-	encryptionKeySize     = 32
-	tokenDirPermissions   = 0o700
+	tokenFilePermissions      = 0o600
+	temporaryTokenPattern     = ".moomoo-token-*"
+	keyringService            = "moomoo"
+	keyringUser               = "default"
+	encryptionKeyUser         = "token-encryption-key"
+	encryptionKeySize         = 32
+	tokenDirPermissions       = 0o700
+	machineKeyFallbackWarning = "Warning: the system keyring is unavailable. The login token is encrypted with a key derived from this computer's hostname and username. Anyone who can read the token file and knows those values can decrypt it. Sign in again after a keyring is available to store a stronger key."
 )
 
 // LoadFromKeyring reads a token created by older CLI versions.
@@ -113,7 +115,7 @@ func getOrCreateEncryptionKey() ([]byte, error) {
 		return key, nil
 	}
 	if !errors.Is(err, keyring.ErrNotFound) {
-		return nil, err
+		return fallbackMachineKey(), nil
 	}
 	key = make([]byte, encryptionKeySize)
 	if _, err := rand.Read(key); err != nil {
@@ -121,9 +123,18 @@ func getOrCreateEncryptionKey() ([]byte, error) {
 	}
 	encoded := base64.RawStdEncoding.EncodeToString(key)
 	if err := keyring.Set(keyringService, encryptionKeyUser, encoded); err != nil {
-		return nil, fmt.Errorf("store encryption key: %w", err)
+		return fallbackMachineKey(), nil
 	}
 	return key, nil
+}
+
+var machineKeyFallbackOnce sync.Once
+
+func fallbackMachineKey() []byte {
+	machineKeyFallbackOnce.Do(func() {
+		fmt.Fprintln(os.Stderr, machineKeyFallbackWarning)
+	})
+	return deriveMachineKey()
 }
 
 func loadEncryptionKey() ([]byte, error) {

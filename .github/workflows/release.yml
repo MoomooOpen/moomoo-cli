@@ -55,7 +55,16 @@ jobs:
         run: go test ./...
 
       - name: Build release assets
-        run: scripts/build-release.sh "${{ steps.meta.outputs.version }}"
+        env:
+          MOOMOO_CLI_RELEASE_SIGNING_KEY: ${{ secrets.MOOMOO_CLI_RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${MOOMOO_CLI_RELEASE_SIGNING_KEY}" ]]; then
+            echo "MOOMOO_CLI_RELEASE_SIGNING_KEY secret is required to sign moomoo_checksums.txt" >&2
+            exit 1
+          fi
+          scripts/build-release.sh "${{ steps.meta.outputs.version }}"
+          test -f "dist/moomoo_checksums.txt.sig"
 
       - name: Delete existing release
         if: ${{ inputs.delete_existing }}

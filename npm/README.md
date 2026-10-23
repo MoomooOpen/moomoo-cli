@@ -51,7 +51,7 @@ npm update -g @moomoo/moomoo-cli
 ```
 
 The default GitHub Release source is `https://github.com/MoomooOpen/moomoo-cli`.
-Set `MOOMOO_CLI_RELEASE_BASE` only when testing a fork or private release source.
+Set `MOOMOO_CLI_RELEASE_BASE` only when testing a fork or private release source. Production installs still verify the official embedded public key, so unsigned or differently signed forks will fail verification.
 
 To test a temporary prerelease:
 
