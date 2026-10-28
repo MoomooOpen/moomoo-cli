@@ -77,6 +77,7 @@ var (
 	httpClient       *client.Client
 	quoteSvc         *service.QuoteService
 	tradeSvc         *service.TradeService
+	skillWrapSvc     *service.SkillWrapService
 	cryptoSvc        *service.CryptoService
 	requestReporter  *reporting.Reporter
 	cmdStartTime     time.Time
@@ -402,6 +403,7 @@ func effectiveTokenFile() string {
 func initServices() {
 	quoteSvc = service.NewQuoteService(httpClient)
 	tradeSvc = service.NewTradeService(httpClient)
+	skillWrapSvc = service.NewSkillWrapService(httpClient)
 	cryptoSvc = service.NewCryptoService(httpClient)
 }
 
