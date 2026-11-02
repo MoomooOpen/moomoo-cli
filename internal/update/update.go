@@ -49,7 +49,7 @@ const (
 	archiveExtZip       = "zip"
 	releaseTagPath      = "/releases/tag/"
 	windowsExecutable   = ".exe"
-	npmInstallHint      = "This CLI was installed by npm. Run `npm update -g @moomoo/moomoo-cli` to upgrade."
+	npmInstallHint      = "This CLI was installed by npm. If installed from GitHub, run `npm install -g github:MoomooOpen/moomoo-cli --install-links=true` to upgrade. If installed from the npm registry, run `npm update -g @moomoo/moomoo-cli`."
 	homebrewInstallHint = "This CLI appears to be managed by Homebrew. Run `brew upgrade moomoo` to upgrade."
 )
 
