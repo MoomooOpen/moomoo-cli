@@ -12,26 +12,29 @@ import (
 const (
 	headerAuthorization = "Authorization"
 	headerContentType   = "Content-Type"
+	headerReportSource  = "X-Fhl-Report-Source"
 	contentTypeJSON     = "application/json"
 	bearerPrefix        = "Bearer "
 )
 
 type Reporter struct {
-	endpoint string
-	token    string
-	client   *http.Client
-	queue    chan Event
-	flush    chan chan struct{}
-	done     chan struct{}
-	mu       sync.RWMutex
-	wg       sync.WaitGroup
-	once     sync.Once
+	endpoint     string
+	token        string
+	reportSource string
+	client       *http.Client
+	queue        chan Event
+	flush        chan chan struct{}
+	done         chan struct{}
+	mu           sync.RWMutex
+	wg           sync.WaitGroup
+	once         sync.Once
 }
 
 type Options struct {
 	Host           string
 	Endpoint       string
 	Token          string
+	ReportSource   string
 	QueueSize      int
 	RequestTimeout time.Duration
 	HTTPClient     *http.Client
@@ -60,12 +63,13 @@ func NewReporter(opts Options) *Reporter {
 	}
 
 	r := &Reporter{
-		endpoint: endpoint,
-		token:    opts.Token,
-		client:   httpClient,
-		queue:    make(chan Event, queueSize),
-		flush:    make(chan chan struct{}),
-		done:     make(chan struct{}),
+		endpoint:     endpoint,
+		token:        opts.Token,
+		reportSource: opts.ReportSource,
+		client:       httpClient,
+		queue:        make(chan Event, queueSize),
+		flush:        make(chan chan struct{}),
+		done:         make(chan struct{}),
 	}
 	r.wg.Add(1)
 	go r.run()
@@ -167,6 +171,9 @@ func (r *Reporter) send(event Event) {
 		return
 	}
 	req.Header.Set(headerContentType, contentTypeJSON)
+	if len(r.reportSource) > 0 {
+		req.Header.Set(headerReportSource, r.reportSource)
+	}
 	if token := r.authToken(); token != "" {
 		req.Header.Set(headerAuthorization, bearerPrefix+token)
 	}

@@ -327,11 +327,13 @@ func syncStoredAccount(path string, store *auth.TokenStore) {
 		_ = store.Save(path)
 		return
 	}
+	source, _ := reportSourceHeaderValue()
 	httpClient := client.New(
 		currentAPIBase(),
 		client.WithToken(store.AccessToken),
 		client.WithClientName(auth.BuildClientName(clientNameFlag)),
 		client.WithVersion(Version),
+		client.WithReportSource(source),
 	)
 	accounts, err := service.NewTradeService(httpClient).ListAccounts(context.Background())
 	if err != nil {

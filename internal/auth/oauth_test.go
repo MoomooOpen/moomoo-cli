@@ -331,6 +331,38 @@ func TestPostForm_HTTPError(t *testing.T) {
 	}
 }
 
+func TestOAuthRequestsCarryReportSource(t *testing.T) {
+	previous := oauthReportSource
+	t.Cleanup(func() { oauthReportSource = previous })
+	SetReportSource("6")
+
+	var jsonHeader, formHeader string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/json":
+			jsonHeader = r.Header.Get(headerReportSource)
+		case "/form":
+			formHeader = r.Header.Get(headerReportSource)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	if _, err := postJSON(srv.URL+"/json", map[string]string{"key": "val"}); err != nil {
+		t.Fatalf("postJSON() error = %v", err)
+	}
+	if _, err := postForm(srv.URL+"/form", url.Values{"grant_type": {"refresh_token"}}); err != nil {
+		t.Fatalf("postForm() error = %v", err)
+	}
+	if jsonHeader != "6" {
+		t.Fatalf("JSON %s = %q, want 6", headerReportSource, jsonHeader)
+	}
+	if formHeader != "6" {
+		t.Fatalf("form %s = %q, want 6", headerReportSource, formHeader)
+	}
+}
+
 // ── readResponseBody ────────────────────────────────────────────────────────
 
 func TestReadResponseBody_OK(t *testing.T) {
