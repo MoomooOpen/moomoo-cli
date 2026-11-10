@@ -20,26 +20,34 @@ func TestBuildPlaceOrderRequestDefaultsToMarketOrder(t *testing.T) {
 	}()
 	cfg = &config.Config{DefaultAcct: "account-1"}
 	orderFlags = struct {
-		price        string
-		auxPrice     string
-		qty          int64
-		typ          string
-		account      string
-		exchange     string
-		orderID      string
-		market       string
-		pageSize     int
-		start        int64
-		end          int64
-		symbol       string
-		side         string
-		timeInForce  string
-		lotType      string
-		remark       string
-		session      string
-		orderClass   string
-		multiLegInfo string
-		execute      string
+		price            string
+		auxPrice         string
+		qty              int64
+		typ              string
+		account          string
+		exchange         string
+		orderID          string
+		market           string
+		pageSize         int
+		start            int64
+		end              int64
+		symbol           string
+		side             string
+		timeInForce      string
+		lotType          string
+		remark           string
+		session          string
+		orderClass       string
+		multiLegInfo     string
+		execute          string
+		subAccount       string
+		positionID       string
+		expireTime       int64
+		trailType        string
+		trailValue       string
+		trailSpread      string
+		positionOpenType string
+		algoInfo         string
 	}{typ: defaultOrderType, timeInForce: defaultTimeInForce}
 
 	req, err := buildPlaceOrderRequest("US.AAPL", "10", orderSideBuy)
@@ -63,26 +71,34 @@ func TestBuildPlaceOrderRequestNormalizesHKSymbol(t *testing.T) {
 	}()
 	cfg = &config.Config{DefaultAcct: "account-1"}
 	orderFlags = struct {
-		price        string
-		auxPrice     string
-		qty          int64
-		typ          string
-		account      string
-		exchange     string
-		orderID      string
-		market       string
-		pageSize     int
-		start        int64
-		end          int64
-		symbol       string
-		side         string
-		timeInForce  string
-		lotType      string
-		remark       string
-		session      string
-		orderClass   string
-		multiLegInfo string
-		execute      string
+		price            string
+		auxPrice         string
+		qty              int64
+		typ              string
+		account          string
+		exchange         string
+		orderID          string
+		market           string
+		pageSize         int
+		start            int64
+		end              int64
+		symbol           string
+		side             string
+		timeInForce      string
+		lotType          string
+		remark           string
+		session          string
+		orderClass       string
+		multiLegInfo     string
+		execute          string
+		subAccount       string
+		positionID       string
+		expireTime       int64
+		trailType        string
+		trailValue       string
+		trailSpread      string
+		positionOpenType string
+		algoInfo         string
 	}{typ: defaultOrderType, timeInForce: defaultTimeInForce}
 
 	req, err := buildPlaceOrderRequest("HK.700", "10", orderSideBuy)

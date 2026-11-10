@@ -12,6 +12,7 @@ import (
 
 // Table header labels for the position command.
 const (
+	posHeaderPositionID  = "Position ID"
 	posHeaderCode        = "Code"
 	posHeaderName        = "Name"
 	posHeaderSide        = "Side"
@@ -44,6 +45,7 @@ func init() {
 	positionCmd.Flags().String("symbol", "", "Filter by "+securitySymbolUsage+" (default: no filter)")
 	positionCmd.Flags().String("pl-ratio-min", "", "Minimum profit/loss ratio, for example -0.1 means at least -10% (default: no filter)")
 	positionCmd.Flags().String("pl-ratio-max", "", "Maximum profit/loss ratio, for example 0.2 means at most +20% (default: no filter)")
+	positionCmd.Flags().String("asset-category", "", "JP asset category: DOMESTIC or FOREIGN (required for JP derivative accounts; JP margin defaults to FOREIGN)")
 	rootCmd.AddCommand(positionCmd)
 }
 
@@ -55,6 +57,10 @@ func runPosition(cmd *cobra.Command, _ []string) error {
 	}
 
 	ctx := cmdContext(cmd)
+	filter.AssetCategory, err = resolveAssetCategory(ctx, account, filter.AssetCategory)
+	if err != nil {
+		return err
+	}
 	positions, err := tradeSvc.GetPositions(ctx, account, filter)
 	if err != nil {
 		return fmt.Errorf("fetching positions: %w", err)
@@ -83,6 +89,10 @@ func buildPositionRequest(cmd *cobra.Command) (string, service.PositionFilter, e
 	if err != nil {
 		return "", service.PositionFilter{}, fmt.Errorf("reading pl-ratio-max flag: %w", err)
 	}
+	assetCategory, err := cmd.Flags().GetString("asset-category")
+	if err != nil {
+		return "", service.PositionFilter{}, fmt.Errorf("reading asset-category flag: %w", err)
+	}
 
 	account = resolveAccount(account)
 	if len(account) == 0 {
@@ -95,9 +105,10 @@ func buildPositionRequest(cmd *cobra.Command) (string, service.PositionFilter, e
 	}
 
 	filter := service.PositionFilter{
-		Code:       normalizedSymbol,
-		PLRatioMin: plRatioMin,
-		PLRatioMax: plRatioMax,
+		Code:          normalizedSymbol,
+		PLRatioMin:    plRatioMin,
+		PLRatioMax:    plRatioMax,
+		AssetCategory: assetCategory,
 	}
 	return account, filter, nil
 }
@@ -105,6 +116,7 @@ func buildPositionRequest(cmd *cobra.Command) (string, service.PositionFilter, e
 // renderPositionTable writes position data as a formatted table to stdout.
 func renderPositionTable(positions []service.Position) {
 	tw := output.NewTableWriter(os.Stdout,
+		posHeaderPositionID,
 		posHeaderCode,
 		posHeaderName,
 		posHeaderSide,
@@ -121,6 +133,7 @@ func renderPositionTable(positions []service.Position) {
 
 	for _, p := range positions {
 		tw.AddRow(
+			p.PositionID,
 			p.Code,
 			p.StockName,
 			formatPositionSide(p.PositionSide),

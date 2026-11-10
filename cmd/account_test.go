@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/MoomooOpen/moomoo-cli/internal/client"
 	"github.com/MoomooOpen/moomoo-cli/internal/service"
 )
 
@@ -54,5 +59,83 @@ func TestHasTradingMarket(t *testing.T) {
 	}
 	if hasTradingMarket([]int{marketHongKong}, marketCrypto) {
 		t.Fatal("expected crypto market to be absent")
+	}
+}
+
+func TestFormatSubAccounts(t *testing.T) {
+	got := formatSubAccounts([]service.SubAccount{{Type: "General", ID: "714914"}, {ID: "715000"}})
+	want := "General:714914, 715000"
+	if got != want {
+		t.Fatalf("formatSubAccounts() = %q, want %q", got, want)
+	}
+}
+
+func TestResolveSubAccountID(t *testing.T) {
+	restore := stubAccounts(t, `{"s":"ok","d":{"accounts":[`+
+		`{"account_id":"one","security_firm":"FUTUJP","acc_type":"cash","sub_accounts":[{"sub_acc_id":"714908","sub_acc_type":"General"}]},`+
+		`{"account_id":"many","security_firm":"FUTUJP","acc_type":"cash","sub_accounts":[{"sub_acc_id":"1","sub_acc_type":"General"},{"sub_acc_id":"2","sub_acc_type":"NISA"}]},`+
+		`{"account_id":"us","security_firm":"FUTUINC","acc_type":"margin"}]}}`)
+	defer restore()
+
+	got, err := resolveSubAccountID(context.Background(), "one", "")
+	if err != nil || got != "714908" {
+		t.Fatalf("single sub account = %q, %v", got, err)
+	}
+	got, err = resolveSubAccountID(context.Background(), "many", "2")
+	if err != nil || got != "2" {
+		t.Fatalf("explicit sub account = %q, %v", got, err)
+	}
+	if _, err = resolveSubAccountID(context.Background(), "many", ""); err == nil {
+		t.Fatal("expected multiple sub_acc_id values to require --sub-acc-id")
+	}
+	got, err = resolveSubAccountID(context.Background(), "us", "")
+	if err != nil || got != "" {
+		t.Fatalf("non-JP sub account = %q, %v", got, err)
+	}
+}
+
+func TestResolveAssetCategory(t *testing.T) {
+	restore := stubAccounts(t, `{"s":"ok","d":{"accounts":[`+
+		`{"account_id":"margin","security_firm":"FUTUJP","acc_type":"margin"},`+
+		`{"account_id":"deriv","security_firm":"FUTUJP","acc_type":"derivative"},`+
+		`{"account_id":"cash","security_firm":"FUTUJP","acc_type":"cash"},`+
+		`{"account_id":"us","security_firm":"FUTUINC","acc_type":"margin"}]}}`)
+	defer restore()
+
+	got, err := resolveAssetCategory(context.Background(), "margin", "")
+	if err != nil || got != assetCategoryForeign {
+		t.Fatalf("JP margin category = %q, %v", got, err)
+	}
+	if _, err = resolveAssetCategory(context.Background(), "deriv", ""); err == nil {
+		t.Fatal("expected JP derivative account to require --asset-category")
+	}
+	got, err = resolveAssetCategory(context.Background(), "deriv", "domestic")
+	if err != nil || got != assetCategoryDomestic {
+		t.Fatalf("explicit category = %q, %v", got, err)
+	}
+	got, err = resolveAssetCategory(context.Background(), "cash", "")
+	if err != nil || got != "" {
+		t.Fatalf("JP cash category = %q, %v", got, err)
+	}
+	got, err = resolveAssetCategory(context.Background(), "us", "")
+	if err != nil || got != "" {
+		t.Fatalf("non-JP category = %q, %v", got, err)
+	}
+	if _, err = resolveAssetCategory(context.Background(), "us", "BOTH"); err == nil {
+		t.Fatal("expected unsupported asset category to fail")
+	}
+}
+
+func stubAccounts(t *testing.T, body string) func() {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(writer, body)
+	}))
+	previous := tradeSvc
+	tradeSvc = service.NewTradeService(client.New(server.URL))
+	return func() {
+		server.Close()
+		tradeSvc = previous
 	}
 }
