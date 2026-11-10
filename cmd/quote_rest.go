@@ -54,12 +54,13 @@ func init() {
 }
 
 func loadQuoteRESTSpecs() []quoteRESTSpec {
-	specs := make([]quoteRESTSpec, 0, len(quoteRESTSpecs))
+	specs := make([]quoteRESTSpec, 0, len(quoteRESTSpecs)+len(octoberQuoteSpecs))
 	for _, spec := range quoteRESTSpecs {
 		if spec.Group == quoteGroupID {
 			specs = append(specs, spec)
 		}
 	}
+	specs = append(specs, octoberQuoteSpecs...)
 	return specs
 }
 
