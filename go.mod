@@ -3,6 +3,7 @@ module github.com/MoomooOpen/moomoo-cli
 go 1.27.3
 
 require (
+	github.com/coder/websocket v1.8.13
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/zalando/go-keyring v0.2.6

@@ -186,6 +186,7 @@ Quote commands require quote permission. Securities symbols use `MARKET.CODE`, s
 | Command | Purpose | Key options |
 | --- | --- | --- |
 | `moomoo quote <symbol...>` | Get real-time quotes for one or more securities. | Add `--format json` for scripts. |
+| `moomoo quote subscribe` | Subscribe to realtime pushes for a bounded time. | `--symbols`, `--types`, `--duration` (default `20s`), `--max-messages` (default `50`) |
 | `moomoo basicinfo <symbol...>` | Get static symbol information in batch. | Add `--format json` for complete fields. |
 | `moomoo snapshot <symbol...>` | Get market snapshots in batch. | Add `--format json` for complete fields. |
 | `moomoo kline <symbol>` | Get the latest K-line bars. | `--num`, `--ktype`, `--autype`, `--extended-time`, `--format json` |
