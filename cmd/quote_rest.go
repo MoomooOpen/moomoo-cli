@@ -207,9 +207,9 @@ var quoteRESTAggregates = []quoteRESTAggregate{
 	{
 		Cmd:             "search",
 		Use:             "search [keyword]",
-		Short:           "Search news, community content, or stock feeds",
+		Short:           "Search news, community content or stock feeds",
 		SelectorFlag:    "type",
-		SelectorDefault: "news",
+		SelectorDefault: "community",
 		Variants: []quoteRESTVariant{
 			{Value: "news", Cmd: "news-search"},
 			{Value: "community", Cmd: "community-search"},
@@ -322,6 +322,14 @@ func newQuoteRESTAggregateCommand(aggregate quoteRESTAggregate, specByCmd map[st
 	}
 	cmd.Flags().String(aggregate.SelectorFlag, aggregate.SelectorDefault, quoteRESTAggregateSelectorUsage(aggregate))
 	addQuoteRESTAggregateFlags(cmd, aggregate, variantSpecs)
+	if aggregate.Cmd == "search" {
+		if flag := cmd.Flags().Lookup("sort-type"); flag != nil {
+			flag.Usage = "Sort order: news TIME/PV (default: TIME); community TIME/HEAT"
+		}
+		if flag := cmd.Flags().Lookup("page-size"); flag != nil {
+			flag.Usage = "Page size (default: news 10; community and feed 20)"
+		}
+	}
 	return cmd
 }
 
@@ -704,6 +712,12 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 		}
 	}
 
+	if spec.ID == newsSearchEndpoint {
+		if err := validateNewsSearch(cmd, args, query); err != nil {
+			return err
+		}
+	}
+
 	if spec.ID == "quote.warrant_screen" {
 		applyWarrantPageDefault(cmd, body)
 	}
@@ -754,7 +768,10 @@ func isQuoteRESTSymbolParam(name string) bool {
 }
 
 func shouldNormalizeQuoteRESTSymbol(p quoteRESTParam) bool {
-	return isQuoteRESTSymbolParam(p.Name) && p.Flag != quoteRESTKeywordFlag
+	if p.Flag != "" {
+		return isQuoteRESTSymbolParam(p.Flag)
+	}
+	return isQuoteRESTSymbolParam(p.Name)
 }
 
 func resolveQuoteRESTKeyword(cmd *cobra.Command, args []string, spec *quoteRESTSpec) (quoteRESTParam, string, error) {

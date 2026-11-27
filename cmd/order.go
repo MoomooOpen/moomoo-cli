@@ -132,13 +132,14 @@ var orderStatusLabels = map[string]string{
 var orderFlags struct {
 	price            string
 	auxPrice         string
-	qty              int64
+	qty              string
 	typ              string
 	account          string
 	exchange         string
 	orderID          string
 	market           string
 	pageSize         int
+	pageFlag         string
 	start            int64
 	end              int64
 	symbol           string
@@ -322,17 +323,19 @@ func registerPlaceFlags(cmd *cobra.Command) {
 func registerListOrderFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account (default: configured default_account)")
 	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "Market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
-	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Results per page, range 10-100 (default: 50)")
+	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Results per page, range 1-100 (default: 50)")
+	cmd.Flags().StringVar(&orderFlags.pageFlag, "page-flag", "", "Initial pagination cursor (default: first page; remaining pages fetched automatically)")
 }
 
 // registerHistoryOrderFlags adds flags for the history orders command.
 func registerHistoryOrderFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account (default: configured default_account)")
 	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "Market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
-	cmd.Flags().Int64Var(&orderFlags.start, "start", 0, "Start time as a microsecond timestamp (default: unrestricted)")
-	cmd.Flags().Int64Var(&orderFlags.end, "end", 0, "End time as a microsecond timestamp (default: unrestricted)")
+	cmd.Flags().Int64Var(&orderFlags.start, "start", 0, "Start time in microseconds (default: server chooses a 90-day window)")
+	cmd.Flags().Int64Var(&orderFlags.end, "end", 0, "End time in microseconds (default: server chooses a 90-day window)")
 	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Filter by "+securitySymbolUsage+" (default: no filter)")
-	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Results per page, range 10-100 (default: 50)")
+	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Results per page, range 1-100 (default: 50)")
+	cmd.Flags().StringVar(&orderFlags.pageFlag, "page-flag", "", "Initial pagination cursor (default: first page; remaining pages fetched automatically)")
 }
 
 // registerDetailOrderFlags adds flags for the detail order command.
@@ -344,7 +347,7 @@ func registerDetailOrderFlags(cmd *cobra.Command) {
 
 // registerModifyFlags adds flags required by the modify order command.
 func registerModifyFlags(cmd *cobra.Command) {
-	cmd.Flags().Int64Var(&orderFlags.qty, "qty", 0, "New order quantity (required)")
+	cmd.Flags().StringVar(&orderFlags.qty, "qty", "", "New order quantity (required)")
 	cmd.Flags().StringVar(&orderFlags.price, "price", "", "New order price as a string (default: unchanged; required for limit orders)")
 	cmd.Flags().StringVar(&orderFlags.auxPrice, "aux-price", "", "New trigger price as a string (default: unchanged)")
 	cmd.Flags().StringVar(&orderFlags.trailType, "trail-type", "", "New trailing type: RATIO, AMOUNT (trailing stop orders only)")
@@ -396,7 +399,7 @@ func runPlaceOrder(cmd *cobra.Command, args []string, side string) error {
 		return err
 	}
 	proceed, err := gateTradeExecution(
-		dryrun.Order(req.Side, req.Code, formatQty(req.Qty), req.Price),
+		dryrun.Order(req.Side, req.Code, orderQuantity(req.QtyText, req.Qty), req.Price),
 		orderFlags.execute,
 		placeOrderPreview(req),
 	)
@@ -415,7 +418,7 @@ func runGenericPlaceOrder(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	proceed, err := gateTradeExecution(
-		dryrun.Order(req.Side, req.Code, formatQty(req.Qty), req.Price),
+		dryrun.Order(req.Side, req.Code, orderQuantity(req.QtyText, req.Qty), req.Price),
 		orderFlags.execute,
 		placeOrderPreview(req),
 	)
@@ -429,7 +432,7 @@ func placeOrderPreview(req service.PlaceOrderRequest) map[string]any {
 	preview := map[string]any{
 		"side":        req.Side,
 		"symbol":      req.Code,
-		"qty":         req.Qty,
+		"qty":         orderQuantity(req.QtyText, req.Qty),
 		"type":        req.OrderType,
 		"price":       req.Price,
 		"account":     req.Account,
@@ -471,21 +474,27 @@ func buildPlaceOrderRequest(rawSymbol, rawQty, side string) (service.PlaceOrderR
 	if err != nil {
 		return service.PlaceOrderRequest{}, err
 	}
-	req := service.PlaceOrderRequest{Account: account, Qty: qty}
+	req := service.PlaceOrderRequest{Account: account, Qty: qty, QtyText: strings.TrimSpace(rawQty)}
 	if err := applyPlaceOrderFlags(&req, rawSymbol, side); err != nil {
 		return service.PlaceOrderRequest{}, err
 	}
 	return req, nil
 }
 
-func parseOrderQuantityAndAccount(rawQty string) (int64, string, error) {
-	qty, err := strconv.ParseInt(rawQty, qtyParseBase, qtyParseBitSize)
-	if err != nil {
-		return 0, "", fmt.Errorf("parsing quantity: %w", err)
+func orderQuantity(text string, fallback int64) string {
+	if len(text) > 0 {
+		return text
 	}
-	if qty <= 0 {
+	return formatQty(fallback)
+}
+
+func parseOrderQuantityAndAccount(rawQty string) (int64, string, error) {
+	value, err := normalizeOptionalDecimal(rawQty, "quantity")
+	if err != nil || len(value) == 0 {
 		return 0, "", fmt.Errorf("quantity must be greater than 0")
 	}
+	parsed, _ := strconv.ParseFloat(value, qtyParseBitSize)
+	qty := int64(parsed)
 	account := resolveAccount(orderFlags.account)
 	if len(account) == 0 {
 		return 0, "", fmt.Errorf("account ID is required; use --account or configure default_account")
@@ -713,6 +722,7 @@ func submitOrder(cmd *cobra.Command, req service.PlaceOrderRequest) error {
 			Price:   parseDisplayPrice(req.Price),
 			Qty:     req.Qty,
 		}
+		order.SetDisplayValues(req.Price, req.QtyText)
 	}
 
 	printResult(order, func() {
@@ -728,7 +738,7 @@ func runModifyOrder(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	proceed, err := gateTradeExecution(
-		dryrun.Replace(args[0], formatQty(req.Qty), req.Price),
+		dryrun.Replace(args[0], orderQuantity(req.QtyText, req.Qty), req.Price),
 		orderFlags.execute,
 		modifyOrderPreview(args[0], req),
 	)
@@ -748,6 +758,7 @@ func runModifyOrder(cmd *cobra.Command, args []string) error {
 			Price:   parseDisplayPrice(req.Price),
 			Qty:     req.Qty,
 		}
+		order.SetDisplayValues(req.Price, req.QtyText)
 		printResult(order, func() {
 			renderSingleOrder(order)
 		})
@@ -788,9 +799,11 @@ func buildModifyOrderRequest() (service.ModifyOrderRequest, error) {
 	if len(account) == 0 {
 		return service.ModifyOrderRequest{}, fmt.Errorf("account ID is required; use --account or configure default_account")
 	}
-	if orderFlags.qty <= 0 {
+	qtyText, err := normalizeOptionalDecimal(orderFlags.qty, "qty")
+	if err != nil || len(qtyText) == 0 {
 		return service.ModifyOrderRequest{}, fmt.Errorf("qty must be greater than 0")
 	}
+	qtyValue, _ := strconv.ParseFloat(qtyText, qtyParseBitSize)
 	if len(strings.TrimSpace(orderFlags.exchange)) == 0 {
 		return service.ModifyOrderRequest{}, fmt.Errorf("exchange is required")
 	}
@@ -821,7 +834,8 @@ func buildModifyOrderRequest() (service.ModifyOrderRequest, error) {
 	return service.ModifyOrderRequest{
 		Account:     account,
 		Exchange:    strings.ToUpper(strings.TrimSpace(orderFlags.exchange)),
-		Qty:         orderFlags.qty,
+		Qty:         int64(qtyValue),
+		QtyText:     qtyText,
 		Price:       price,
 		AuxPrice:    auxPrice,
 		TrailType:   trailType,
@@ -835,7 +849,7 @@ func modifyOrderPreview(orderID string, req service.ModifyOrderRequest) map[stri
 	preview := map[string]any{
 		"action":    "modify",
 		"order_id":  orderID,
-		"qty":       req.Qty,
+		"qty":       orderQuantity(req.QtyText, req.Qty),
 		"price":     req.Price,
 		"aux_price": req.AuxPrice,
 		"exchange":  req.Exchange,
@@ -871,9 +885,9 @@ func singleOrderColumns(order *service.Order) ([]string, []string) {
 	addTextOrderColumn(&headers, &row, orderHeaderSymbol, order.Symbol)
 	addTextOrderColumn(&headers, &row, orderHeaderSide, formatOrderValue(order.Side, orderSideLabels))
 	addTextOrderColumn(&headers, &row, orderHeaderType, formatOrderValue(order.Type, orderTypeLabels))
-	addPriceOrderColumn(&headers, &row, order.Price)
-	addIntOrderColumn(&headers, &row, orderHeaderQty, order.Qty)
-	addIntOrderColumn(&headers, &row, orderHeaderFilled, order.FilledQty)
+	addTextOrderColumn(&headers, &row, orderHeaderPrice, nonzeroDecimal(order.PriceText()))
+	addTextOrderColumn(&headers, &row, orderHeaderQty, nonzeroDecimal(order.QuantityText()))
+	addTextOrderColumn(&headers, &row, orderHeaderFilled, nonzeroDecimal(order.FilledQuantityText()))
 	addTextOrderColumn(&headers, &row, orderHeaderStatus, formatOrderValue(order.Status, orderStatusLabels))
 	addTextOrderColumn(&headers, &row, orderHeaderTime, formatTimestamp(order.CreateTime))
 
@@ -888,20 +902,12 @@ func addTextOrderColumn(headers *[]string, row *[]string, header string, value s
 	*row = append(*row, value)
 }
 
-func addPriceOrderColumn(headers *[]string, row *[]string, value float64) {
-	if value <= 0 {
-		return
+func nonzeroDecimal(value string) string {
+	parsed, err := strconv.ParseFloat(value, qtyParseBitSize)
+	if err != nil || parsed <= 0 {
+		return ""
 	}
-	*headers = append(*headers, orderHeaderPrice)
-	*row = append(*row, fmt.Sprintf(orderPriceFormat, value))
-}
-
-func addIntOrderColumn(headers *[]string, row *[]string, header string, value int64) {
-	if value <= 0 {
-		return
-	}
-	*headers = append(*headers, header)
-	*row = append(*row, fmt.Sprintf("%d", value))
+	return value
 }
 
 // runCancelOrder handles the cancel subcommand.
@@ -965,6 +971,7 @@ func runListOrders(cmd *cobra.Command, args []string) error {
 		Account:  account,
 		Market:   strings.TrimSpace(orderFlags.market),
 		PageSize: orderFlags.pageSize,
+		PageFlag: orderFlags.pageFlag,
 	}
 	orders, err := tradeSvc.ListOpenOrders(ctx, req)
 	if err != nil {
@@ -1004,6 +1011,7 @@ func buildHistoryOrdersRequest() (service.HistoryOrdersRequest, error) {
 		return service.HistoryOrdersRequest{}, err
 	}
 	return service.HistoryOrdersRequest{
+		PageFlag: orderFlags.pageFlag,
 		Account:  account,
 		Market:   market,
 		Start:    orderFlags.start,
@@ -1232,9 +1240,9 @@ func renderOrderDetail(order *service.Order) {
 	tw.AddRow("symbol", order.Symbol)
 	tw.AddRow("side", formatOrderValue(order.Side, orderSideLabels))
 	tw.AddRow("type", formatOrderValue(order.Type, orderTypeLabels))
-	tw.AddRow("price", fmt.Sprintf(orderPriceFormat, order.Price))
-	tw.AddRow("qty", fmt.Sprintf("%d", order.Qty))
-	tw.AddRow("filled_qty", fmt.Sprintf("%d", order.FilledQty))
+	tw.AddRow("price", order.PriceText())
+	tw.AddRow("qty", order.QuantityText())
+	tw.AddRow("filled_qty", order.FilledQuantityText())
 	tw.AddRow("status", formatOrderValue(order.Status, orderStatusLabels))
 	tw.AddRow("create_time", formatTimestamp(order.CreateTime))
 	for _, key := range sortedOrderExtraKeys(order.Extra) {
@@ -1295,9 +1303,9 @@ func orderToRow(o *service.Order) []string {
 		o.Symbol,
 		formatOrderValue(o.Side, orderSideLabels),
 		formatOrderValue(o.Type, orderTypeLabels),
-		fmt.Sprintf(orderPriceFormat, o.Price),
-		fmt.Sprintf("%d", o.Qty),
-		fmt.Sprintf("%d", o.FilledQty),
+		o.PriceText(),
+		o.QuantityText(),
+		o.FilledQuantityText(),
 		formatOrderValue(o.Status, orderStatusLabels),
 		formatTimestamp(o.CreateTime),
 	}

@@ -22,13 +22,14 @@ func TestBuildPlaceOrderRequestDefaultsToMarketOrder(t *testing.T) {
 	orderFlags = struct {
 		price            string
 		auxPrice         string
-		qty              int64
+		qty              string
 		typ              string
 		account          string
 		exchange         string
 		orderID          string
 		market           string
 		pageSize         int
+		pageFlag         string
 		start            int64
 		end              int64
 		symbol           string
@@ -73,13 +74,14 @@ func TestBuildPlaceOrderRequestNormalizesHKSymbol(t *testing.T) {
 	orderFlags = struct {
 		price            string
 		auxPrice         string
-		qty              int64
+		qty              string
 		typ              string
 		account          string
 		exchange         string
 		orderID          string
 		market           string
 		pageSize         int
+		pageFlag         string
 		start            int64
 		end              int64
 		symbol           string
@@ -292,5 +294,28 @@ func TestFormatDetailValueFormatsExtraTimeFields(t *testing.T) {
 
 	if got != formatTimestamp(1709251200) {
 		t.Fatalf("formatted time = %q", got)
+	}
+}
+
+func TestFractionalOrderQuantityParsing(t *testing.T) {
+	previous := orderFlags
+	defer func() { orderFlags = previous }()
+	orderFlags.account = "123"
+	orderFlags.typ = "market"
+	req, err := buildPlaceOrderRequest("US.AAPL", "0.123456789123456789", "BUY")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.QtyText != "0.123456789123456789" {
+		t.Fatalf("qty = %q", req.QtyText)
+	}
+	orderFlags.qty = "0.123456789123456789"
+	orderFlags.exchange = "US"
+	mod, err := buildModifyOrderRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mod.QtyText != req.QtyText {
+		t.Fatalf("modify qty = %q", mod.QtyText)
 	}
 }

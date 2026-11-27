@@ -31,6 +31,26 @@ func TestParseMarketCodeSymbol(t *testing.T) {
 			input: "SH.600519",
 			want:  &Symbol{Market: MarketSH, Code: "600519", Full: "SH.600519"},
 		},
+		{
+			name:  "crypto market normalizes",
+			input: "cc.btc",
+			want:  &Symbol{Market: MarketCC, Code: "BTC", Full: "CC.BTC"},
+		},
+		{
+			name:  "japan market",
+			input: "JP.7203",
+			want:  &Symbol{Market: MarketJP, Code: "7203", Full: "JP.7203"},
+		},
+		{
+			name:  "singapore market",
+			input: "SG.1V2",
+			want:  &Symbol{Market: MarketSG, Code: "1V2", Full: "SG.1V2"},
+		},
+		{
+			name:  "malaysia market",
+			input: "BMS.MYIPO007",
+			want:  &Symbol{Market: MarketBMS, Code: "MYIPO007", Full: "BMS.MYIPO007"},
+		},
 	}
 
 	for _, test := range tests {
@@ -60,6 +80,18 @@ func TestParseRejectsNonMarketCodeFormats(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), "MARKET.CODE") {
 				t.Fatalf("Parse(%q) error = %v, want MARKET.CODE hint", input, err)
+			}
+		})
+	}
+}
+
+func TestParseAdditionalMarketPrefixes(t *testing.T) {
+	markets := []string{MarketSG, MarketJP, MarketMY, MarketAU, MarketCA, MarketKR, MarketCN, MarketCC, MarketHKCC, MarketBMS}
+	for _, market := range markets {
+		t.Run(market, func(t *testing.T) {
+			got, err := Parse(strings.ToLower(market) + ".example")
+			if err != nil || got.Full != market+".EXAMPLE" {
+				t.Fatalf("Parse(%s) = %#v, %v", market, got, err)
 			}
 		})
 	}

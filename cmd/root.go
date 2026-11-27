@@ -136,6 +136,7 @@ var rootCmd = &cobra.Command{
 func Execute() error {
 	args, internal, err := extractInternalInvocationArgs(os.Args[1:])
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	reportSourceMode = internal.source

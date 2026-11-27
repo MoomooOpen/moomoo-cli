@@ -181,7 +181,7 @@ This section summarizes the supported authentication, market data, securities tr
 
 ### Market Data
 
-Quote commands require quote permission. Securities symbols use `MARKET.CODE`, such as `HK.00700` and `US.AAPL`. Hong Kong numeric codes are normalized to five digits, so `HK.700` is sent as `HK.00700`. `moomoo search [keyword]` is the exception: it accepts a plain search keyword such as `AAPL` or `renewable energy`, and the CLI sends that keyword through the backend `symbol` query field without symbol-format validation.
+Quote commands require quote permission. Symbols use `MARKET.CODE`, such as `HK.00700`, `US.AAPL`, `JP.7203` and `CC.BTC`. Hong Kong numeric codes are normalized to five digits, so `HK.700` is sent as `HK.00700`. `moomoo search [keyword]` is the exception: it accepts a plain search keyword such as `AAPL` or `renewable energy`, and the CLI sends that keyword through the backend `symbol` query field without symbol-format validation.
 
 | Command | Purpose | Key options |
 | --- | --- | --- |
@@ -195,7 +195,7 @@ Quote commands require quote permission. Securities symbols use `MARKET.CODE`, s
 | `moomoo order-book <symbol>` | Get real-time order book depth. | `--num`, `--format json`; `depth` is an alias. |
 | `moomoo rank [type]` | Show market rankings. | `volume`, `turnover`, `gainers`, `losers`, `amplitude`; `--market`, `--count` |
 | `moomoo option chain <symbol>` | Query an underlying's option chain. | `--start`, `--end`, `--index-option-type`, `--filter-standard` |
-| `moomoo search [keyword]` | Search news, community content, or stock feeds by keyword. | `--type news/community/feed`, `--keyword`, `--size`, `--lang`, `--format json` |
+| `moomoo search [keyword]` | Search news, community content, or securities by keyword. | `--type news/community/feed`, `--keyword`, `--page-size`, `--lang`, `--format json` |
 
 Additional quote REST commands include aggregated views such as `broker`, `capital`, `company`, `corporate-actions`, `financials`, `option-data`, `plate`, `research`, `shareholders`, `short`, `watchlist`, and `valuation`, plus standalone screen/list commands such as `stock-screen`, `warrant-screen`, `option-screen`, `future-info`, `market-state`, and `trading-days`. See `.local_docs/moomoo-cli/docs/quote-cli-guide.md` for the full Quote command guide.
 

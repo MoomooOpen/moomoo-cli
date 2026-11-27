@@ -8,22 +8,42 @@ import (
 
 // Market identifier constants.
 const (
-	MarketHK  = "HK"
-	MarketUS  = "US"
-	MarketSH  = "SH"
-	MarketSZ  = "SZ"
-	MarketBJ  = "BJ"
-	MarketBMD = "BMD"
+	MarketHK   = "HK"
+	MarketUS   = "US"
+	MarketSH   = "SH"
+	MarketSZ   = "SZ"
+	MarketBJ   = "BJ"
+	MarketSG   = "SG"
+	MarketJP   = "JP"
+	MarketMY   = "MY"
+	MarketAU   = "AU"
+	MarketCA   = "CA"
+	MarketKR   = "KR"
+	MarketCN   = "CN"
+	MarketCC   = "CC"
+	MarketHKCC = "HKCC"
+	MarketBMD  = "BMD"
+	MarketBMS  = "BMS"
 )
 
 // knownMarkets contains market prefixes recognised by the moomoo API.
 var knownMarkets = map[string]bool{
-	MarketHK:  true,
-	MarketUS:  true,
-	MarketSH:  true,
-	MarketSZ:  true,
-	MarketBJ:  true,
-	MarketBMD: true,
+	MarketHK:   true,
+	MarketUS:   true,
+	MarketSH:   true,
+	MarketSZ:   true,
+	MarketBJ:   true,
+	MarketSG:   true,
+	MarketJP:   true,
+	MarketMY:   true,
+	MarketAU:   true,
+	MarketCA:   true,
+	MarketKR:   true,
+	MarketCN:   true,
+	MarketCC:   true,
+	MarketHKCC: true,
+	MarketBMD:  true,
+	MarketBMS:  true,
 }
 
 // HK stock code width for zero-padding.
